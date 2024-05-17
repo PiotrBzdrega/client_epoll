@@ -2,6 +2,13 @@
 #include <string>
 #include <cstring> // std::memset
 
+//TODO:test
+#include <vector>
+#include <sstream>
+#include <charconv>
+#include <cmath>
+
+
 #include <sys/socket.h> //connect, bind
 #include <unistd.h> //close
 #include <sys/file.h> //flock, open
@@ -14,6 +21,9 @@
 #include <signal.h> //signal
 
 
+//TODO:TEST
+#include <cmath>
+
 constexpr auto MAXEVENTS = 64;
 constexpr int MAX_READ = 2048;
 constexpr int CLOSED = -1;
@@ -23,6 +33,22 @@ auto handle_error = [](const char* msg, bool exit_proc=false)
     perror(msg); 
     if(exit_proc) {exit(EXIT_FAILURE);}
 };
+
+
+// auto closeFd(int &fileDescriptor)
+// {
+//     int ret = close(fileDescriptor);
+//     fileDescriptor = CLOSED;
+//     return ret;
+// };
+
+// auto closeFd(epoll_event& event)
+// {
+//     int ret = close(event.data.fd);
+//     event.data.fd = CLOSED;
+//     return ret;
+// };
+
 
 class Servinfo
 {
@@ -73,7 +99,7 @@ int connect_socket(const std::string_view &ip, const std::string_view &port)
             std::cout<<"EAI error: "<<gai_strerror(ret)<<"\n";
             // handle_error("getnameinfo");
             // continue;
-            //TODO: Temporary failure in name resolution happend from time to time
+            //TODO: Temporary failure in name resolution happend from time to time  
         }
         
 
@@ -118,7 +144,6 @@ int connect_socket(const std::string_view &ip, const std::string_view &port)
         if (ret == -1)
         {
           close(fd);
-          fd = CLOSED;
           handle_error("setsockopt");
           continue;
         }
@@ -149,7 +174,6 @@ int connect_socket(const std::string_view &ip, const std::string_view &port)
         if(ret == -1)
         {
             close(fd);
-            fd = CLOSED;
             handle_error("fctl-set");
             continue;
         }
@@ -159,7 +183,6 @@ int connect_socket(const std::string_view &ip, const std::string_view &port)
             if (errno != EINPROGRESS)
             {
                 close(fd);
-                fd = CLOSED;
                 handle_error("connect");
                 continue;
             }
@@ -179,7 +202,6 @@ int connect_socket(const std::string_view &ip, const std::string_view &port)
                 if (ret == -1)
                 {
                     close(fd);
-                    fd = CLOSED;
                     handle_error("select");
                     continue; 
                 }
@@ -188,7 +210,6 @@ int connect_socket(const std::string_view &ip, const std::string_view &port)
                 {
                     /* time-out */
                     close(fd);
-                    fd = CLOSED;
                     handle_error("select time-out");
                     continue;
                 }
@@ -248,7 +269,8 @@ int connect_socket(const std::string_view &ip, const std::string_view &port)
     }
     return fd;
 }
-
+/* ./client -i 172.22.77.70 -p 3490 */
+/* ./client -i challenge01.root-me.org -p 52002*/
 int main(int argc, char *argv[])
 {
     int ret;
@@ -318,12 +340,10 @@ int main(int argc, char *argv[])
     signal(SIGPIPE, SIG_IGN);
     
     int client_fd = CLOSED;
-    while (1/*client_fd == CLOSED*/)
+    while (client_fd == CLOSED)
     {
-        client_fd = connect_socket(ip, port);
-        if(client_fd!=CLOSED)
-            break;
         sleep(5);
+        client_fd = connect_socket(ip, port);  
     }
 
     //epoll interface
@@ -338,7 +358,7 @@ int main(int argc, char *argv[])
     struct epoll_event event;
 
     event.data.fd = client_fd;
-    event.events = EPOLLIN | EPOLLET | EPOLLRDHUP; /* edge-triggered read able to detect peer shutdown */
+    event.events = EPOLLIN | EPOLLET  | EPOLLRDHUP; /* edge-triggered read able to detect peer shutdown */
 
     /*  Add an entry to the interest list of the epoll file descriptor, fd_epoll */
     ret = epoll_ctl(epoll_fd, EPOLL_CTL_ADD ,client_fd, &event);
@@ -358,8 +378,8 @@ int main(int argc, char *argv[])
 	}
 
     struct itimerspec ts = {0};
-    constexpr int interval = 10;
-    constexpr int startup = 5;
+    constexpr int interval = 0;//10; //TODO:test
+    constexpr int startup = 0;//5; //TODO:test 
     ts.it_interval.tv_sec = interval;
 	ts.it_value.tv_sec = startup;
 
@@ -408,29 +428,18 @@ int main(int argc, char *argv[])
 
             std::cout<<"event: "<<events[i].events<<"\n";
 
-            if (events[i].events & EPOLLRDHUP)
-            {
-                fprintf (stderr, "epoll error. events=%u\n", events[i].events);
-	            close(events[i].data.fd);
-                if (client_fd == events[i].data.fd)
-                {
-                    client_fd = CLOSED;
-                }
-                
-	            continue;
-            }
-            else
             /* error or hang up happend */
-            if ((events[i].events & EPOLLERR) ||
-                (events[i].events & EPOLLHUP) ||
+            if ( /*(events[i].events & EPOLLRDHUP) || */
+                (events[i].events & EPOLLERR) ||
+                /*(events[i].events & EPOLLHUP) || */
                 (!(events[i].events & EPOLLIN)))
             {
-                fprintf (stderr, "epoll error. events=%u\n", events[i].events);
-	            close(events[i].data.fd);
-                if (client_fd == events[i].data.fd)
+                fprintf (stderr, "epoll error. events=%u\n", events[i].events); //TODO: event string
+                if (events[i].data.fd == client_fd)
                 {
                     client_fd = CLOSED;
                 }
+                close(events[i].data.fd);
                 
 	            continue;
             }
@@ -497,8 +506,11 @@ int main(int argc, char *argv[])
                * data. */
               auto drop_connection = false;
               int all_reads=0;
+              std::string v;
               while (1)
               {
+                
+
                 /* If errno == EAGAIN, that means we have read all
                 * data. So go back to the main loop. */
                 ret = read(events[i].data.fd,buf,sizeof buf ); 
@@ -512,6 +524,11 @@ int main(int argc, char *argv[])
                     else
                     { 
                         std::cout<<"read all data:"<<all_reads << " bytes\n";
+                        std::printf("%s\n",v.c_str());
+                        v.append("\n");
+                        ret=write(events[i].data.fd, v.c_str(), v.size());
+                        std::cout<<ret<<"\n";
+                        // drop_connection = true;//TODO:test
                     }
                     break;
                 }
@@ -520,7 +537,7 @@ int main(int argc, char *argv[])
                 {
                   /* End of file. The remote has closed the
                   * connection. */
-                  drop_connection = true;
+                //   drop_connection = true; //TODO:test
                   break;
                 }
                 else
@@ -530,8 +547,34 @@ int main(int argc, char *argv[])
                     buf[ret-1]='\0';
                   }
                   
-                  std::cout<<"Received: "<<ret<<" bytes from fd: "<<events[i].data.fd<<"\n";
-                  std::cout<<buf<<"\n";
+                    std::cout<<"Received: "<<ret<<" bytes from fd: "<<events[i].data.fd<<"\n";
+                    std::cout<<buf<<"\n";
+                    std::string word;
+                    std::istringstream msg(buf);
+                    std::vector<int> numbers;
+                    while (msg >> word)
+                    {
+                        int value;
+                        if(std::from_chars(word.data(),word.data()+word.size(),value).ec == std::errc{})
+                        {
+                            std::cout<<value<<"\n";
+                            numbers.emplace_back(value);
+                        }
+                    }
+
+                    float c = std::sqrt(numbers[1]) * numbers[2];
+                    auto d = std::roundf(c*100.0)/100.0;
+                    std::printf("%f\n",d);
+                    std::string g=std::to_string(d);
+                    if (g.find('.'))
+                    {
+                        v = g.substr(0,g.find('.')+3);
+                        std::printf("%s\n",v.c_str());
+                    }
+                    
+                    // break;
+                    
+                    
                   all_reads+= ret;
                 }
               }
@@ -541,11 +584,13 @@ int main(int argc, char *argv[])
                 std::cout<<"Dropped connection on descriptor: "<< events[i].data.fd << "\n";
                 /* Closing the descriptor will make epoll remove it
                  * from the set of descriptors which are monitored. */
-                close(events[i].data.fd);
-                if (client_fd == events[i].data.fd)
+                if (events[i].data.fd == client_fd)
                 {
                     client_fd = CLOSED;
                 }
+                close(events[i].data.fd);
+
+                exit(EXIT_SUCCESS); //TODO:test
               }
               
               
