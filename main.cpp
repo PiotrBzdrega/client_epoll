@@ -99,7 +99,7 @@ int main(int argc, char *argv[])
     COM::EndPoint client(ip,port,with_tls);
 
 
-    while (!client.connectIO())
+    while (!client.connect())
     {
         sleep(2); // try again after a while
     }
@@ -123,7 +123,7 @@ int main(int argc, char *argv[])
     ret = epoll_ctl(epoll_fd, EPOLL_CTL_ADD ,client(), &event);
     if (ret == -1)
     {
-        client.closeIO();
+        client.close();
         closeFd(epoll_fd);
         handle_error("epoll_ctl_client", true);      
     }
@@ -132,7 +132,7 @@ int main(int argc, char *argv[])
     int timer_fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
 	if (timer_fd == -1) 
     {
-        client.closeIO();
+        client.close();
         closeFd(epoll_fd);
 		handle_error("timerfd_create", true);
 	}
@@ -145,7 +145,7 @@ int main(int argc, char *argv[])
 
     if (timerfd_settime(timer_fd, TFD_TIMER_ABSTIME, &ts, NULL) == -1)
     {
-        client.closeIO();
+        client.close();
         closeFd(timer_fd);
         closeFd(epoll_fd);
 		handle_error("timerfd_create", true);
@@ -161,7 +161,7 @@ int main(int argc, char *argv[])
     ret = epoll_ctl(epoll_fd, EPOLL_CTL_ADD ,timer_fd, &event);
     if (ret == -1)
     {
-        client.closeIO();
+        client.close();
         closeFd(timer_fd);
         closeFd(epoll_fd);
         handle_error("epoll_ctl_timer", true);      
@@ -178,7 +178,7 @@ int main(int argc, char *argv[])
         auto wait = epoll_wait(epoll_fd, events, MAXEVENTS, -1); //wait infinite time for events
         if (wait == -1)
         {
-            client.closeIO();
+            client.close();
             closeFd(timer_fd);
             closeFd(epoll_fd);
             handle_error("epoll_wait",true);      
@@ -198,7 +198,7 @@ int main(int argc, char *argv[])
 
                 if (events[i].data.fd == client())
                 {
-                    client.closeIO();
+                    client.close();
                 }
                 else
                 {
@@ -230,7 +230,7 @@ int main(int argc, char *argv[])
                     else
                     if (ret != sizeof(uint64_t))
                     {
-                        client.closeIO();
+                        client.close();
                         closeFd(timer_fd);
                         closeFd(epoll_fd);
                         handle_error("read_timer",true); 
@@ -248,7 +248,7 @@ int main(int argc, char *argv[])
                             {
                                 if (errno != EAGAIN)
                                 {
-                                    client.closeIO();
+                                    client.close();
                                     handle_error("write");
                                 } 
                             }                  
@@ -323,7 +323,7 @@ int main(int argc, char *argv[])
                     std::cout<<"Dropped connection on fd: "<< client()<< "\n";
                     /* Closing the descriptor will make epoll remove it
                      * from the set of descriptors which are monitored. */
-                    client.closeIO();
+                    client.close();
                 }
               
               
@@ -333,7 +333,7 @@ int main(int argc, char *argv[])
         while (client() == CLOSED)
         {
             sleep(5);
-            client.connectIO();
+            client.connect();
 
             if(client() == CLOSED)
             {continue;}
@@ -349,7 +349,7 @@ int main(int argc, char *argv[])
             ret = epoll_ctl(epoll_fd, EPOLL_CTL_ADD ,client(), &event);
             if (ret == -1)
             {
-                client.closeIO();
+                client.close();
                 closeFd(epoll_fd);
                 handle_error("epoll_ctl_client", true);      
             }

@@ -1,6 +1,7 @@
 #pragma once
 // #include <functional>
 #include <string_view>
+#include <vector>
 
 #include "IO.h"
 #include "TLS.h"
@@ -19,7 +20,7 @@ static void handle_error(const char* msg, bool exit_proc=false)
 static int closeFd(int fileDescriptor)
 {   
     std::fprintf(stderr,"Close fd: %u\n",fileDescriptor);
-    return close(fileDescriptor);
+    return ::close(fileDescriptor);
 };
 
 namespace COM
@@ -32,15 +33,17 @@ namespace COM
         TLS _tls;
         int _fd = CLOSED; /* file descriptor */
         int connectTCP();
+        int setNonBlock(int fd);
+        std::vector<EndPoint> peer;
     public:
         EndPoint (std::string_view &ip, std::string_view &port, bool ssl);
         ~EndPoint ();
-        bool connectIO ();
-        bool closeIO ();
+        bool connect ();
+        bool close ();
+        void accept (sockaddr *addr, socklen_t *addr_len);
         int operator()() {return _fd;}
         int read (void* buffer, int count) override;
         int write (const void* buffer, int count) override;
-
     };
 
 }

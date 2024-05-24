@@ -123,27 +123,14 @@ namespace COM
             //   continue;
             // }
 
-            /* get file descriptor flags */
-            ret = fcntl(fd,F_GETFL,0);
+            ret = setNonBlock(fd);
             if(ret == -1)
             {
-                closeFd(fd);
-                fd = CLOSED;
-                handle_error("fctl-get");          
+                /* setting File Descriptor as nonblock failed */
                 continue;
             }
 
-            /* set as non-blocking if it is not set yet */
-            auto flags = ret | O_NONBLOCK;
-            ret = fcntl (fd, F_SETFL, flags);
-            if(ret == -1)
-            {
-                closeFd(fd);
-                handle_error("fctl-set");
-                continue;
-            }
-
-            if (connect(fd, ptr->ai_addr, ptr->ai_addrlen) == -1) 
+            if (::connect(fd, ptr->ai_addr, ptr->ai_addrlen) == -1) 
             {
                 if (errno != EINPROGRESS)
                 {
@@ -231,7 +218,31 @@ namespace COM
         return fd;
     }
 
-    bool EndPoint::connectIO ()
+    int EndPoint::setNonBlock(int fd)
+    {
+        int ret{};
+        /* get file descriptor flags */
+        ret = fcntl(fd,F_GETFL,0);
+        if(ret == -1)
+        {
+            static_assert(false,"handle removal from peers if already appended");
+            closeFd(fd);
+            fd = CLOSED;
+            handle_error("fctl-get");          
+        }
+        /* set as non-blocking if it is not set yet */
+        auto flags = ret | O_NONBLOCK;
+        ret = fcntl (fd, F_SETFL, flags);
+        if(ret == -1)
+        {
+            static_assert(false,"handle removal from peers if already appended");
+            closeFd(fd);
+            handle_error("fctl-set");
+        }
+        return ret;
+    }
+
+    bool EndPoint::connect ()
     {   
         _fd = connectTCP();
         if (_fd != CLOSED)
@@ -246,7 +257,7 @@ namespace COM
         return false;
     }
 
-    bool EndPoint::closeIO()
+    bool EndPoint::close()
     {   
 
         closeFd(_fd);
@@ -255,6 +266,50 @@ namespace COM
         // static_assert(false,"close tls");
         return false;
     }
+
+    void EndPoint::accept(sockaddr *addr, socklen_t *addr_len)
+    {
+        while (1)
+        {
+            struct sockaddr in_addr;
+            socklen_t in_len;
+            in_len = sizeof in_addr;
+            int fd_in = ::accept(_fd, &in_addr, &in_len);
+            if (fd_in == -1)
+            {
+                printf("errno=%d, EAGAIN=%d, EWOULDBLOCK=%d\n", errno, EAGAIN, EWOULDBLOCK);
+                if ((errno == EAGAIN) || (errno == EWOULDBLOCK))
+                {
+                    std::printf ("processed all incoming connections.\n");
+                    break;
+                }
+                else
+                {
+                    perror ("accept");
+                    break;
+                }
+
+            }
+
+            /* IPv4 and IPv6 addresses from binary to text form*/
+            char addr[INET6_ADDRSTRLEN]={0};
+            switch (in_addr.sa_family)
+            {
+            case AF_INET:
+                inet_ntop(in_addr.sa_family,&(reinterpret_cast<struct sockaddr_in *>(in_addr.sa_data)->sin_addr),addr,sizeof(addr));
+                break;
+            case AF_INET6:
+                inet_ntop(in_addr.sa_family,&reinterpret_cast<struct sockaddr_in6 *>(in_addr.sa_data)->sin6_addr,addr,sizeof(addr));
+                break;
+            }
+            std::printf("Incomming connection from %s\n",addr);
+
+            setNonBlock(fd_in);
+        }
+        
+
+    }
+
 
     int EndPoint::read(void* buffer, int count)
     {
