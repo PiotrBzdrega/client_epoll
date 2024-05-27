@@ -10,11 +10,73 @@
 #include <sys/timerfd.h> // timerfd
 #include <sys/epoll.h> //epoll
 #include <signal.h> //signal
+#include <mqueue.h> //mq
 
 #include "EndPoint.h"
 
-constexpr auto MAXEVENTS = 64;
-constexpr int MAX_READ = 2048;
+// constexpr auto MAXEVENTS = 64;
+// constexpr int MAX_READ = 2048;
+
+constexpr auto mq_name="/mq_client";
+
+/* container to transfer command lines from second instance to EndPoint */
+COM::ThreadSafeQueue<std::string> queue;
+
+void new_msg_queue(union sigval sv)
+{
+
+    mqd_t mqdes = *(static_cast<mqd_t*>(sv.sival_ptr));
+
+    struct mq_attr attr;
+    /* Determine max. msg size; allocate buffer to receive msg */
+    if (mq_getattr(mqdes, &attr) == -1)
+    {
+        handle_error("mq_getattr");
+    }    
+    
+    //std::printf("Attributes of MQ %s \n",mq_name.c_str());
+    //std::printf("Maximum message size: %ld bytes\n", attr.mq_msgsize);
+    //std::printf("Maximum number of messages: %ld\n", attr.mq_maxmsg);
+
+    /* Re-register notification , mq_notify is only one-shot event*/
+
+    struct sigevent sev;
+    sev.sigev_notify = SIGEV_THREAD; //Deliver via thread creation
+    sev.sigev_notify_function = new_msg_queue; // thread function 
+    sev.sigev_notify_attributes = NULL;
+    sev.sigev_value.sival_ptr = sv.sival_ptr;   /* Arg. to thread func. */
+    if (mq_notify(mqdes, &sev) == -1)
+    {
+        handle_error("mq_notify");
+    }
+
+    char *buf;
+    buf = (char*)malloc(attr.mq_msgsize); //Maximum message size
+    if (buf == NULL)
+    {
+        handle_error("malloc");
+    }
+        
+    //received byte count
+    ssize_t rcv = mq_receive(mqdes, buf, attr.mq_msgsize, NULL);
+    if (rcv == -1)
+        handle_error("mq_receive");
+
+    /* returned array could not have null terminator*/
+    buf[rcv]='\0';
+
+    /* even if buffer is released (free()), malloc can allocate same area in next msg; there is no \0 character at the end, so rcv len must be took into account for format %.*s*/
+    std::printf("Read %zd bytes from MQ %s: %s\n", rcv, mq_name, buf);
+    int ret = std::strcmp("exit",buf);
+
+    /* push new data into queue */
+    queue.push(buf);
+    free(buf);
+    if (ret == 0)
+    {
+        exit(EXIT_SUCCESS);         /* Terminate the process */
+    }
+}
 
 int main(int argc, char *argv[])
 {
@@ -23,19 +85,99 @@ int main(int argc, char *argv[])
     bool with_tls = false;
     bool test_timer = false;
 
-#ifdef __linux__
-    int pid_file = open("/var/run/client.pid", O_CREAT | O_RDWR, 0666); //TODO:why 666?
-    ret = flock(pid_file, LOCK_EX | LOCK_NB);
-    if(ret) {
+    mqd_t mqdes;
+    /* create if do not exist */
+    int pid_file = open("/var/run/client.pid", O_CREAT | O_RDWR, 0666); //The return value is a file descriptor
+
+/*The fcntl() system call provides record
+locking, allowing processes to place multiple read and write locks on different
+regions of the same file.*/
+
+    struct flock fl;
+
+    // Initialize the flock structure
+    fl.l_type = F_WRLCK;   // Exclusive lock
+    fl.l_whence = SEEK_SET; //Seek from beginning of file
+    fl.l_start = 0;
+    fl.l_len = 0; //whole file if 0
+
+    // Attempt to acquire the lock
+    int rc = fcntl(pid_file, F_SETLK, &fl); //Set record locking info (non-blocking)
+    
+    if(rc) 
+    {
+        /* Another instance */
+
+        std::printf("Read arguments:\n");
+        for (size_t i = 0; i < argc; i++)
+        {
+           std::printf("%s\t",argv[i]);
+        }
+        std::printf("\n");
+        
+        // Open the message queue for sending
+        mqdes = mq_open(mq_name, O_WRONLY);
+        if (mqdes == (mqd_t)-1) {
+            handle_error("mq_open");
+        }
+
+        std::printf("sizeof(%s) = %ld\n",argv[argc-1], strlen(argv[argc-1]));
+
+        if (mq_send(mqdes, argv[argc-1], strlen(argv[argc-1]), 0) == -1) 
+        {
+            handle_error("mq_send");
+        }
+
+        std::cout<<"errno: "<<strerror(errno)<<"\n";
         if(EWOULDBLOCK == errno)
         {
             std::cout<<"\033[0;91m another instance is running \033[0m\n";
-            handle_error("flock",true);
+
+            int rc = fcntl(pid_file, F_GETLK, &fl); //Get record locking info
+            std::cout<<"\033[0;91m Process ID of the process that holds the blocking lock "<<fl.l_pid<<"\033[0m\n";       
+
+            exit(EXIT_SUCCESS);
         }
     }
-#elif _WIN32
+    else
+    {
+        /* First Instance */
+        mqdes = mq_open(mq_name,O_RDONLY | O_CREAT | O_NONBLOCK /* | O_EXCL */,0600,NULL);
+        if (mqdes == (mqd_t) -1)
+        {
+            handle_error("mq_open");
+        }
 
-#endif
+        struct sigevent sev;
+        sev.sigev_notify = SIGEV_THREAD; //Deliver via thread creation
+        sev.sigev_notify_function = new_msg_queue; // thread function 
+        sev.sigev_notify_attributes = NULL;
+        sev.sigev_value.sival_ptr = &mqdes;   /* Arg. to thread func. */
+
+        /* register a notification request for the message queue */
+        if (mq_notify(mqdes, &sev) == -1)
+        {
+            handle_error("mq_notify");
+        }
+
+        /* clean mq in case of previous remains ,notification won't be rised in case of non-empty queue*/
+        struct mq_attr attr;
+        if (mq_getattr(mqdes, &attr) == -1)
+        {
+            handle_error("mq_getattr");
+        }    
+
+        char *emp_buf;
+        emp_buf = (char*)malloc(attr.mq_msgsize); //Maximum message size
+        if (emp_buf == NULL)
+        {
+            handle_error("malloc");
+        }
+        while(mq_receive(mqdes, emp_buf, attr.mq_msgsize, 0) >= 0)
+        {
+          std::cout << "empty the mq " << emp_buf << "\n";
+        }
+    }
 
     int option_index = 0;
     static struct option long_options[] = {
@@ -96,8 +238,8 @@ int main(int argc, char *argv[])
     if this is not assigned , epoll_wait leave with undefined behavior when pipe closes abruptly */
     signal(SIGPIPE, SIG_IGN);
     
-    COM::EndPoint client(ip,port,with_tls);
-
+    /* create client instance */
+    COM::EndPoint client(ip,port,queue);
 
     while (!client.connect())
     {
@@ -173,7 +315,6 @@ int main(int argc, char *argv[])
 
     while (1)
     {    
-        
         char buf[MAX_READ]={0};
         auto wait = epoll_wait(epoll_fd, events, MAXEVENTS, -1); //wait infinite time for events
         if (wait == -1)

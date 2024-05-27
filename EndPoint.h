@@ -2,48 +2,52 @@
 // #include <functional>
 #include <string_view>
 #include <vector>
+#include <thread>
 
 #include "IO.h"
-#include "TLS.h"
-#include "Servinfo.h"
 
-#include <unistd.h> //close, read, write
 
-constexpr int CLOSED = -1;
+#include "ThreadSafeQueue.h"
 
-static void handle_error(const char* msg, bool exit_proc=false)
-{
-    perror(msg); 
-    if(exit_proc) {exit(EXIT_FAILURE);}
-};
+#include <sys/epoll.h> //epoll
 
-static int closeFd(int fileDescriptor)
-{   
-    std::fprintf(stderr,"Close fd: %u\n",fileDescriptor);
-    return ::close(fileDescriptor);
-};
+constexpr auto MAXEVENTS = 64;
+constexpr auto MAX_READ = 2048;
 
 namespace COM
 {
-    class EndPoint : IO
+    class EndPoint
     {
+        //TODO: Thread Pool needed to handle responses from Epool waiter
+        //TODO: Cannot read and write simultaneously for same fd, insert some mutex for each EndPoint
     private:
+        class Epool;
         std::string_view _ip;
         std::string_view _port;
-        TLS _tls;
-        int _fd = CLOSED; /* file descriptor */
-        int connectTCP();
-        int setNonBlock(int fd);
-        std::vector<EndPoint> peer;
+        std::vector<IO> _peer; //TODO: use unordered map if needed
+        std::thread stdIN; /* execute msg's from queue */
+        void interpretRequest(std::shared_ptr<std::string> arg);
     public:
-        EndPoint (std::string_view &ip, std::string_view &port, bool ssl);
+        EndPoint (std::string_view &ip, std::string_view &port, ThreadSafeQueue<std::string> &queue);
         ~EndPoint ();
-        bool connect ();
-        bool close ();
-        void accept (sockaddr *addr, socklen_t *addr_len);
+        void addPeer(std::string_view ip, std::string_view port, bool ssl);
+        template<typename... Args>
+        IO& find(Args... args);
+        // void accept (sockaddr *addr, socklen_t *addr_len);
+    };
+
+    class EndPoint::Epool
+    {
+        
+    private:
+        int _fd = CLOSED; /* epool file descriptor */
+        std::thread waiter; /* provides events to file descriptors */
+        int waiterFunction();
+    public:
+        Epool();
+        ~Epool();
         int operator()() {return _fd;}
-        int read (void* buffer, int count) override;
-        int write (const void* buffer, int count) override;
+        bool addNew(int fd, uint32_t param);
     };
 
 }
