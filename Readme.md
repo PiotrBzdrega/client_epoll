@@ -1,0 +1,4 @@
+- PoolThread, each peer should have own 
+- request can have write/read/close/connect
+- if local contains ip or port then bind
+- Peer is in this case server, we need to store peers in vector
