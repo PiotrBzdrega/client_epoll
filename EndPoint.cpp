@@ -1,4 +1,5 @@
 #include "EndPoint.h"
+#include "IPeer.h"
 
 #include <stdexcept> // for std::out_of_range
 #include <sstream> //istringstream
@@ -38,10 +39,11 @@ namespace COM
 
     void EndPoint::interpretRequest(std::shared_ptr<std::string> arg)
     {
-        //-i 172.22.77.70 -m adam
-        //-f 3 -r
-        //-f 4 -c
-
+        //-i 172.22.77.70 -m adam (write to ip)
+        //-f 3 -r (read from file descriptor)
+        //-f 4 -c (close file descriptor)
+        //-i 172.22.77.70:2111 (connect with ip)
+        req request{req::NONE};
         std::istringstream iss(*arg);
         std::string_view opt;
 	    std::string word;
@@ -228,7 +230,7 @@ namespace COM
         /* clean container that stores events returned  by wait*/
         events = (struct epoll_event*)  calloc (MAXEVENTS, sizeof(struct epoll_event));
 
-        char buf[MAX_READ]={0};
+        // char buf[MAX_READ]={0};
 
         while (1)
         {

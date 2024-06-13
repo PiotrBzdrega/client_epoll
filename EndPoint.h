@@ -12,7 +12,6 @@
 #include <sys/epoll.h> //epoll
 
 constexpr auto MAXEVENTS = 64;
-constexpr auto MAX_READ = 2048;
 
 namespace COM
 {

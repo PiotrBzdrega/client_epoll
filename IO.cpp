@@ -240,7 +240,67 @@ namespace COM
         }
         return ret;
     }
-    bool IO::connect ()
+    void IO::threadFunc()
+    {
+        while (1)
+        {
+            /* if queue is empty -> wait */
+            auto query =_que.pop();
+            
+ 
+            auto request = std::get<req>((*query));
+            auto message = std::get<std::string>(*(query));
+
+            /* drop close, read, write if disconnected*/
+            if ( (*this)()==CLOSED && request != req::CONNECT) { continue; }
+
+
+            switch (request)
+            {
+            case req::CONNECT:
+                while ((*this)()==CLOSED)
+                {
+                    connect();
+                    sleep(5);
+                }
+            case req::CLOSE:
+                close();
+            case req::READ:
+
+                int all_reads{};
+                while (1)
+                {
+
+                    auto res = read();
+                    if (res == -1)
+                    {
+                        /* errno == EAGAIN, that means we have read all data */
+                        break;
+                    }
+                    else
+                    if(res == 0)
+                    {
+                        clean queue and append close
+                    }
+                    
+                }
+                
+
+            case req::WRITE:
+                write(message.data(), message.size());
+            
+            default:
+                break;
+            }
+            
+        }
+        
+        //
+        
+
+
+    }
+    bool IO::connect()
     {   
         _fd = connectTCP();
         if (_fd != CLOSED)
@@ -265,7 +325,7 @@ namespace COM
         return false;
     }
 
-    int IO::read(void* buffer, int count)
+    int IO::read()
     {
         SSL *ssl_obj = _tls();
 
@@ -274,7 +334,7 @@ namespace COM
         if(ssl_obj != nullptr)
         {
             /* TLS */
-            res=SSL_read(ssl_obj, buffer, count);
+            res=SSL_read(ssl_obj, _buffer, MAX_READ);
             if (res <= 0)
             {
                 switch(_tls.handle_io_failure(res))
@@ -294,7 +354,7 @@ namespace COM
         else
         {
             /* unsecure TCP */
-            res = ::read(_fd,buffer,count);
+            res = ::read(_fd,_buffer, MAX_READ);
             if (res== -1 && errno != EAGAIN)
             {
                 /* some error appears, but anyway socket must be closed, then modify res */
