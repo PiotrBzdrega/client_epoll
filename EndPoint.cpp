@@ -1,5 +1,6 @@
 #include "EndPoint.h"
 #include "IPeer.h"
+#include "IO.h"
 
 #include <stdexcept> // for std::out_of_range
 #include <sstream> //istringstream
@@ -16,16 +17,17 @@ namespace COM
 //TODO:        5. try maybe icmp before blind reconnect for training
 //TODO:        6. IO should contain waiting condition variable, EndPoint should keep lock as long as no request are comming
 
-    EndPoint::EndPoint(std::string_view &ip, std::string_view &port, ThreadSafeQueue<std::string> &queue) : _ip{ip}, _port{port}
+    EndPoint::EndPoint(std::string_view ip, uint16_t port, ThreadSafeQueue<std::string> &queue)
     {
-        add new _peer element to define local param
+        /* create new Peer */
+        _peer.emplace_back(std::make_unique<IO>(ip,port,*this));
+
         // stdIN = std::thread(&EndPoint::stdINLoop,this,queue);
         stdIN = std::thread([&]{
             while (1)
             {
                 interpretRequest(queue.pop());
-            }
-            
+            }    
         });
     } 
 
@@ -45,6 +47,8 @@ namespace COM
 
     void EndPoint::interpretRequest(std::shared_ptr<std::string> arg)
     {
+        verify ip:port correctness
+        handle obtain correct arguments
         //-i 172.22.77.70 -m adam (write to ip)
         //-f 3 -r (read from file descriptor)
         //-f 4 -c (close file descriptor)
@@ -57,6 +61,7 @@ namespace COM
         bool read; /*-r*/
         bool close; /*-c*/
         std::string ip{""}; /*-i*/
+        uint16_t port;
         std::string msg; /*-m*/
 	    while (iss >> word )
         {
@@ -125,12 +130,17 @@ namespace COM
             // auto &peer = find(ip,fd);
             // peer.write(msg.data(),msg.size());
             
-            for ( int i=0; i< _peer.size() ; i++)
+            bool res{};
+            for ( int i=0; i< _peer.size() && res==false ; i++)
             {
-                _peer[0].get()->request()
+                res=_peer[0].get()->request(ip,port,fd,std::make_tuple<query>(request,msg));
+            }
+            if (!res)
+            {
+                /* peer did not found*/
+                _peer.emplace_back(std::make_unique<IO>(ip,port,*this));
             }
             
-                    
 
         }
         catch(const std::exception& e)

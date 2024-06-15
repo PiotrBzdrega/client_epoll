@@ -27,7 +27,7 @@ namespace COM
         std::thread stdIN; /* execute msg's from queue */
         void interpretRequest(std::shared_ptr<std::string> arg);
     public:
-        EndPoint (std::string_view &ip, std::string_view &port, ThreadSafeQueue<std::string> &queue);
+        EndPoint (std::string_view ip, uint16_t port, ThreadSafeQueue<std::string> &queue);
         ~EndPoint ();
         bool appendPeer(int fd, uint32_t param) override;
         void addPeer(std::string_view ip, std::string_view port, bool ssl);

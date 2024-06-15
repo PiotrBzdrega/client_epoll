@@ -13,8 +13,6 @@
 
 constexpr auto MAX_READ = 2048;
 
-using query = std::tuple<req,std::string>;
-
 static void handle_error(const char* msg, bool exit_proc=false)
 {
     perror(msg); 
@@ -38,7 +36,7 @@ namespace COM
     public:
         IO(std::string_view ip, uint16_t port, bool ssl, IManager* manager, ILog* logger, IDB* db);
         // int operator()() {return _fd;}
-        bool request(std::string ip, uint16_t port, int fd, req request,std::string_view msg) override;
+        bool request(std::string ip, uint16_t port, int fd, query &item) override;
         const std::string_view getIp() {return _locIp;}
         bool connect ();
         bool close ();

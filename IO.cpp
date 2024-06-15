@@ -2,11 +2,12 @@
 #include "Servinfo.h"
 
 #include <sys/socket.h> //connect, bind
-#include <arpa/inet.h> // inet_ntop
+#include <arpa/inet.h> // inet_ntop/_pton
 #include <fcntl.h>
 
-
 #include <iostream>
+#include <cstring>
+
 
 int closeFd(int &fileDescriptor)
 {   
@@ -29,12 +30,25 @@ namespace COM
             _tls.create_object();
         }
     }
-    bool IO::request(std::string ip, uint16_t port, int fd, req request, std::string_view msg)
+    bool IO::request(std::string ip, uint16_t port, int fd, query &item)
     {
-        check if request belong to this IO, if peer ip and peer port are not initialized -> connect 
+        //TODO: make in the future only one instance that handle read/write/close/connect/ with list of available masters state/ip/port/fd
+        try to create it
+        // In Linux, if you call connect on a file descriptor that is already connected to a socket, the behavior is specified by the POSIX standard and generally results in an error. Here's what typically happens:
 
-        if request fit current conditions -> add request
+        // Error Returned: The connect function will fail, and it will set the errno to EISCONN to indicate that the socket is already connected. The return value of the connect call will be -1.
 
+        // No Side Effects: The state of the socket remains unchanged. The existing connection remains valid and continues to function as expected.
+
+        if ( ((!ip.empty() && ip == _ip && port !=0 && port==_port) || (fd != CLOSED && fd == _fd)) /* match with file descriptor or ip address*/
+        ||
+            (!ip.empty() && port !=0 && _fd == CLOSED ) /* not initialized connection*/
+        )
+        {
+            /* forward request and potential message*/
+            _que.push(item);
+        }
+        
         return false;
     }
 
@@ -45,7 +59,7 @@ namespace COM
     int IO::connectTCP()
     {
         int ret;
-
+ 
         struct addrinfo hints = {0}; 
         {
             hints.ai_family = AF_UNSPEC;     /* Allow IPv4 or IPv6 */
@@ -55,7 +69,7 @@ namespace COM
         Servinfo servinfo;
         /* Translate name of a service location and/or a service name to set of socket addresses*/
         ret = getaddrinfo(      _locIp.data(), //"172.22.64.1",  //"localhost", /* e.g. "www.example.com" or IP */
-                                _locPort.data(), /* e.g. "http" or port number  */
+                                std::to_string(_locPort).data(), /* e.g. "http" or port number  */
                                 &hints, /* prepared socket address structure*/
                                 &servinfo); /* pointer to sockaddr structure suitable for connecting, sending, binding to an IP/port pair*/
 
@@ -128,14 +142,32 @@ namespace COM
             }
 
             //TODO: bind if local ip/port will be available
-            // /* bind port to socket */
-            // ret = bind(fd, ptr->ai_addr, ptr->ai_addrlen);
-            // if (ret != 0)
-            // {
-            //   closeFd(fd);
-            //   handle_error("bind");          
-            //   continue;
-            // }
+
+            if (!_locIp.empty() || _locPort != 0)
+            {
+                struct sockaddr_in sa;
+
+                // Zero out the sockaddr_in structure
+                std::memset(&sa, 0, sizeof(sa));
+
+                sa.sin_family = AF_INET;  // IPv4
+                sa.sin_port = htons(_locPort);
+
+                if (inet_pton(AF_INET, _locIp.data(), &(sa.sin_addr)) != 1) 
+                {
+                    closeFd(fd);
+                    handle_error("inet_pton");          
+                    continue;
+                }
+                ret = bind(fd, (struct sockaddr*)&sa, sizeof(sa));
+                if (ret != 0)
+                {
+                    closeFd(fd);
+                    handle_error("bind");          
+                    continue;
+                }
+            }
+
 
             ret = setNonBlock(fd);
             if(ret == -1)

@@ -10,6 +10,8 @@
 constexpr auto CLOSED = -1;
 enum class req {CONNECT, CLOSE, WRITE, READ};
 
+using query = std::tuple<req,std::string>;
+
 class IPeer
 {
 private:
@@ -26,7 +28,7 @@ protected:
     };
 public:
     IPeer(IManager* manager, ILog* logger = &emptyLogger, IDB* db = &emptyDB) : _manager(manager), _logger(logger), _db(db){};
-    virtual bool request(std::string ip, uint16_t port, int fd, req request,std::string_view msg) = 0;
+    virtual bool request(std::string ip, uint16_t port, int fd, query &item) = 0;
     virtual ~IPeer() = default;
 };
 
