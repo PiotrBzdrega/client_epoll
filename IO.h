@@ -11,7 +11,6 @@
 #include <condition_variable>
 #include <tuple>
 
-constexpr auto CLOSED = -1;
 constexpr auto MAX_READ = 2048;
 
 using query = std::tuple<req,std::string>;
@@ -22,31 +21,25 @@ static void handle_error(const char* msg, bool exit_proc=false)
     if(exit_proc) {exit(EXIT_FAILURE);}
 };
 
-static int closeFd(int fileDescriptor)
-{   
-    std::fprintf(stderr,"Close fd: %u\n",fileDescriptor);
-    return ::close(fileDescriptor);
-};
-
 namespace COM
 {
     class IO : public IPeer
     {   
     private:
         TLS _tls;
-        std::string_view _ip;
-        std::string_view _port;
-        int _fd = CLOSED; /* endpoint file descriptor */
-        char _buffer[MAX_READ]{};
+        std::string _locIp;
+        uint16_t _locPort;
+        char _buffer[MAX_READ]{}; //TODO:change for std::array
         int connectTCP();
         int setNonBlock(int fd);
         std::thread servant;
         void threadFunc();
         ThreadSafeQueue<query> _que;
     public:
-        IO(std::string_view &ip, std::string_view &port, bool ssl);
-        int operator()() {return _fd;}
-        const std::string_view getIp() {return _ip;}
+        IO(std::string_view ip, uint16_t port, bool ssl, IManager* manager, ILog* logger, IDB* db);
+        // int operator()() {return _fd;}
+        bool request(std::string ip, uint16_t port, int fd, req request,std::string_view msg) override;
+        const std::string_view getIp() {return _locIp;}
         bool connect ();
         bool close ();
         int read();

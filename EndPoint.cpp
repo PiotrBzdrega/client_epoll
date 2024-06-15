@@ -18,6 +18,7 @@ namespace COM
 
     EndPoint::EndPoint(std::string_view &ip, std::string_view &port, ThreadSafeQueue<std::string> &queue) : _ip{ip}, _port{port}
     {
+        add new _peer element to define local param
         // stdIN = std::thread(&EndPoint::stdINLoop,this,queue);
         stdIN = std::thread([&]{
             while (1)
@@ -37,13 +38,18 @@ namespace COM
         }
     }
 
+    bool EndPoint::appendPeer(int fd, uint32_t param)
+    {
+        return false;
+    }
+
     void EndPoint::interpretRequest(std::shared_ptr<std::string> arg)
     {
         //-i 172.22.77.70 -m adam (write to ip)
         //-f 3 -r (read from file descriptor)
         //-f 4 -c (close file descriptor)
         //-i 172.22.77.70:2111 (connect with ip)
-        req request{req::NONE};
+        req request;
         std::istringstream iss(*arg);
         std::string_view opt;
 	    std::string word;
@@ -116,8 +122,16 @@ namespace COM
         try
         {
             /* try to find valid IO*/
-            auto &peer = find(ip,fd);
-            peer.write(msg.data(),msg.size());
+            // auto &peer = find(ip,fd);
+            // peer.write(msg.data(),msg.size());
+            
+            for ( int i=0; i< _peer.size() ; i++)
+            {
+                _peer[0].get()->request()
+            }
+            
+                    
+
         }
         catch(const std::exception& e)
         {

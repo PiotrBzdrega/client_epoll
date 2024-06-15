@@ -49,6 +49,14 @@ namespace COM
 
             return res;
         }
+        void clear()
+        {
+            /* lock function scope */
+            std::lock_guard<std::mutex> lck(mtx); 
+
+            //Erases all elements from the container.
+            que.clear();
+        }
     };
 }
 

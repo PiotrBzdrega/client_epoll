@@ -8,12 +8,16 @@
 
 #include <iostream>
 
+int closeFd(int &fileDescriptor)
+{   
+    std::fprintf(stderr,"Close fd: %u\n",fileDescriptor);
+    return ::close(fileDescriptor);
+};
 
 namespace COM
 {
-    IO::IO(std::string_view &ip, std::string_view &port, bool ssl) : _ip{ip}, _port{port}
+    IO::IO(std::string_view ip, uint16_t port, bool ssl, IManager* manager, ILog* logger, IDB* db) : IPeer(manager), _locIp{ip}, _locPort{port}
     {
-
         if (ssl)
         {
             /* SSL factory context to create SSL objects*/
@@ -24,7 +28,15 @@ namespace COM
             /* create object representing TLS connection */
             _tls.create_object();
         }
-    } 
+    }
+    bool IO::request(std::string ip, uint16_t port, int fd, req request, std::string_view msg)
+    {
+        check if request belong to this IO, if peer ip and peer port are not initialized -> connect 
+
+        if request fit current conditions -> add request
+
+        return false;
+    }
 
     IO::~IO()
     {
@@ -42,8 +54,8 @@ namespace COM
 
         Servinfo servinfo;
         /* Translate name of a service location and/or a service name to set of socket addresses*/
-        ret = getaddrinfo(      _ip.data(), //"172.22.64.1",  //"localhost", /* e.g. "www.example.com" or IP */
-                                _port.data(), /* e.g. "http" or port number  */
+        ret = getaddrinfo(      _locIp.data(), //"172.22.64.1",  //"localhost", /* e.g. "www.example.com" or IP */
+                                _locPort.data(), /* e.g. "http" or port number  */
                                 &hints, /* prepared socket address structure*/
                                 &servinfo); /* pointer to sockaddr structure suitable for connecting, sending, binding to an IP/port pair*/
 
@@ -252,25 +264,22 @@ namespace COM
             auto message = std::get<std::string>(*(query));
 
             /* drop close, read, write if disconnected*/
-            if ( (*this)()==CLOSED && request != req::CONNECT) { continue; }
+            if ( _fd == CLOSED && request != req::CONNECT) { continue; }
 
-
-            switch (request)
+            if (request == req::CONNECT)
             {
-            case req::CONNECT:
-                while ((*this)()==CLOSED)
+                while (_fd==CLOSED)
                 {
                     connect();
                     sleep(5);
                 }
-            case req::CLOSE:
-                close();
-            case req::READ:
-
+            }
+            else
+            if (request == req::READ)
+            {
                 int all_reads{};
                 while (1)
                 {
-
                     auto res = read();
                     if (res == -1)
                     {
@@ -279,26 +288,33 @@ namespace COM
                     }
                     else
                     if(res == 0)
-                    {
-                        clean queue and append close
+                    {   
+                        /* erase all elements */
+                        _que.clear();
+
+                        /* allow to get to close statement */
+                        request = req::CLOSE;
                     }
-                    
+                    else
+                    {
+                        /* Successful read*/
+                        all_reads+= res;
+                        _logger->log(); //TODO: create logger
+                        _db->set(0,0); //TODO: update DB
+                        // logger/callback_to_update_db
+                    }                   
                 }
-                
-
-            case req::WRITE:
-                write(message.data(), message.size());
-            
-            default:
-                break;
             }
-            
+            else
+            if (request == req::WRITE)
+            {
+                write(message.data(), message.size());
+            }
+            if (request == req::CLOSE)
+            {
+                close();
+            }               
         }
-        
-        //
-        
-
-
     }
     bool IO::connect()
     {   
@@ -306,10 +322,10 @@ namespace COM
         if (_fd != CLOSED)
         {
             if (_tls()==nullptr || _tls.connect(_fd) )
-            {
+            {      
+                notifyManager();
                 return true;
-            }
-            
+            }        
         }
         
         return false;
@@ -317,7 +333,6 @@ namespace COM
 
     bool IO::close()
     {   
-
         closeFd(_fd);
         _fd = CLOSED;
 
