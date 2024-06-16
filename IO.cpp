@@ -9,7 +9,7 @@
 #include <cstring>
 
 
-int closeFd(int &fileDescriptor)
+static int closeFd(int &fileDescriptor)
 {   
     std::fprintf(stderr,"Close fd: %u\n",fileDescriptor);
     return ::close(fileDescriptor);
@@ -30,10 +30,10 @@ namespace COM
             _tls.create_object();
         }
     }
-    bool IO::request(std::string ip, uint16_t port, int fd, query &item)
+    bool IO::request(std::string_view ip, uint16_t port, int fd, query &item)
     {
         //TODO: make in the future only one instance that handle read/write/close/connect/ with list of available masters state/ip/port/fd
-        try to create it
+        //try to create it
         // In Linux, if you call connect on a file descriptor that is already connected to a socket, the behavior is specified by the POSIX standard and generally results in an error. Here's what typically happens:
 
         // Error Returned: The connect function will fail, and it will set the errno to EISCONN to indicate that the socket is already connected. The return value of the connect call will be -1.

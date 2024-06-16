@@ -36,7 +36,7 @@ namespace COM
     public:
         IO(std::string_view ip, uint16_t port, bool ssl, IManager* manager, ILog* logger, IDB* db);
         // int operator()() {return _fd;}
-        bool request(std::string ip, uint16_t port, int fd, query &item) override;
+        bool request(std::string_view ip, uint16_t port, int fd, query &item) override;
         const std::string_view getIp() {return _locIp;}
         bool connect ();
         bool close ();

@@ -9,8 +9,8 @@ namespace
     {
         // private:
         //     EmptyLogger() { }
-        public:
-        void log() override {};
+        // public:
+        // void log(std::string_view) override {};
         // EmptyLogger(const EmptyLogger& obj) = delete; // Delete copy constructor
     };
 

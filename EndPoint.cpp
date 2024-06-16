@@ -7,6 +7,64 @@
 #include <iostream> //std::cerr
 #include <string_view> //string_view
 #include <charconv> //std::from_chars
+#include <regex>
+#include <vector>
+
+
+struct addrTCP
+{
+    std::string_view ip;
+    uint16_t port;
+
+    bool
+    isEmpty() const{ return port && !ip.empty() ;}
+};
+
+static addrTCP validateAddrTCP(std::string_view addr, ILog* logger = &emptyLogger)
+{
+    uint16_t port{};
+
+    auto portSep = addr.find(":");
+    if(portSep == addr.npos)
+    { 
+        logger->log("Did not find : delimiter\n");
+        return {"",0}; 
+    }
+
+    if(std::from_chars(addr.data()+portSep+1,addr.data()+addr.size(),port).ec != std::errc() || !port )
+    {
+        /* wrong */
+        logger->log("not valid port in address %s\n",std::string(addr.data()+portSep+1,addr.data()+addr.size()).data());
+        return {"",0}; 
+    }
+
+
+    std::regex pattern("\\.");
+    std::vector<std::string> tokens(
+    std::sregex_token_iterator(addr.begin(), addr.begin() + portSep, pattern, -1),
+    std::sregex_token_iterator()
+    );
+
+    std::array<uint8_t,4> octet;
+
+    int idx{};
+    for( auto token : tokens)
+    {
+        if(std::from_chars(token.data(),token.data()+token.size(),octet[idx]).ec != std::errc() || (!idx && !octet[idx]) ) // first octet cannot have 0
+        {
+            logger->log("Invalid IP address element: %s\n",token.data());
+            return {"",0};
+        }
+        // else
+        // {
+            
+        //     std::printf("%d ",octet[idx]);
+        // }
+        idx++;
+    }
+
+    return {std::string(addr.begin(),addr.begin()+portSep),port};
+}
 
 namespace COM
 {
@@ -17,7 +75,7 @@ namespace COM
 //TODO:        5. try maybe icmp before blind reconnect for training
 //TODO:        6. IO should contain waiting condition variable, EndPoint should keep lock as long as no request are comming
 
-    EndPoint::EndPoint(std::string_view ip, uint16_t port, ThreadSafeQueue<std::string> &queue)
+    EndPoint::EndPoint(std::string_view ip, uint16_t port, ThreadSafeQueue<std::string> &queue,ILog* logger, IDB* db) : _logger(logger), _db(db)
     {
         /* create new Peer */
         _peer.emplace_back(std::make_unique<IO>(ip,port,*this));
@@ -47,9 +105,9 @@ namespace COM
 
     void EndPoint::interpretRequest(std::shared_ptr<std::string> arg)
     {
-        verify ip:port correctness
-        handle obtain correct arguments
-        //-i 172.22.77.70 -m adam (write to ip)
+
+
+        //-i 172.22.77.70:112 -m adam (write to ip)
         //-f 3 -r (read from file descriptor)
         //-f 4 -c (close file descriptor)
         //-i 172.22.77.70:2111 (connect with ip)
@@ -57,24 +115,25 @@ namespace COM
         std::istringstream iss(*arg);
         std::string_view opt;
 	    std::string word;
+        std::string_view ip; /*-i*/
         int fd; /*-f*/
         bool read; /*-r*/
         bool close; /*-c*/
-        std::string ip{""}; /*-i*/
         uint16_t port;
         std::string msg; /*-m*/
 	    while (iss >> word )
         {
-            if (word=="-i" || opt == "-i")
+            if (word=="-i" )
             {
                 /* IP */
-                if (opt != "-i")
+                if (iss >> word )
                 {
-                    opt="-i";
-                    ip=word;
+                    auto [ip,port] =validateAddrTCP(word,_logger);
                 }
-                
-                ip+=" "+word;               
+                else
+                {
+                    throw std::runtime_error("missing ip in arguments");
+                }         
             }
             else
             if (word=="-f")
@@ -83,7 +142,7 @@ namespace COM
                 if(iss >> word )
                 {
                     auto data = word.data();
-                    if (std::from_chars(data,data+word.size(),fd).ec != std::errc())
+                    if (std::from_chars(data,data+word.size(),fd).ec != std::errc() || !fd)
                     {
                         std::printf("Not valid file descriptor: %s\n",data);
                     }
@@ -118,7 +177,7 @@ namespace COM
             }
             else
             {
-                std::printf("NOT EXPECTED ARGUMENT\n");
+                _logger->log("NOT EXPECTED ARGUMENT\n");
                 return;
             }
         }
@@ -133,7 +192,7 @@ namespace COM
             bool res{};
             for ( int i=0; i< _peer.size() && res==false ; i++)
             {
-                res=_peer[0].get()->request(ip,port,fd,std::make_tuple<query>(request,msg));
+                res=_peer[i].get()->request(ip,port,fd,std::tuple<query>(request,msg));
             }
             if (!res)
             {
