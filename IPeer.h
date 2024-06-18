@@ -24,11 +24,11 @@ protected:
     IDB* _db;
     void notifyManager()
     {
-        _manager->appendPeer(_fd);
+        _manager->appendNotificationNode(_fd);
     };
 public:
     IPeer(IManager* manager, ILog* logger = &emptyLogger, IDB* db = &emptyDB) : _manager(manager), _logger(logger), _db(db){};
-    virtual bool request(std::string_view ip, uint16_t port, int fd, query &item) = 0;
+    virtual bool request(std::string_view ip, uint16_t port, int fd,  req request, std::string msg ) = 0;
     virtual ~IPeer() = default;
 };
 

@@ -8,7 +8,8 @@
 #include <string_view> //string_view
 #include <charconv> //std::from_chars
 #include <regex>
-#include <vector>
+#include <tuple>
+
 
 
 struct addrTCP
@@ -81,6 +82,7 @@ namespace COM
         _peer.emplace_back(std::make_unique<IO>(ip,port,*this));
 
         // stdIN = std::thread(&EndPoint::stdINLoop,this,queue);
+        /* wait for new message */
         stdIN = std::thread([&]{
             while (1)
             {
@@ -98,7 +100,7 @@ namespace COM
         }
     }
 
-    bool EndPoint::appendPeer(int fd, uint32_t param)
+    bool EndPoint::appendNotificationNode(int fd, uint32_t param)
     {
         return false;
     }
@@ -111,14 +113,12 @@ namespace COM
         //-f 3 -r (read from file descriptor)
         //-f 4 -c (close file descriptor)
         //-i 172.22.77.70:2111 (connect with ip)
-        req request;
+        req notification;
         std::istringstream iss(*arg);
         std::string_view opt;
 	    std::string word;
         std::string_view ip; /*-i*/
         int fd; /*-f*/
-        bool read; /*-r*/
-        bool close; /*-c*/
         uint16_t port;
         std::string msg; /*-m*/
 	    while (iss >> word )
@@ -134,6 +134,7 @@ namespace COM
                 {
                     throw std::runtime_error("missing ip in arguments");
                 }         
+                notification = req::CONNECT;
             }
             else
             if (word=="-f")
@@ -160,6 +161,7 @@ namespace COM
                 {
                     opt="-m";
                     msg=word;
+                    notification = req::WRITE;
                 }
                 
                 msg+=" "+word;               
@@ -168,68 +170,56 @@ namespace COM
             if (word=="-r")
             {
                 /* READ */
-                read=true;
+                notification = req::READ;
             }
             if (word=="-c")
             {
                 /* CLOSE */
-                close=true;
+                notification = req::CLOSE;
             }
             else
             {
-                _logger->log("NOT EXPECTED ARGUMENT\n");
+                _logger->log("Not expected argument : %s\n",word.data());
                 return;
             }
         }
-        std::printf("IP: %s MSG: %s\n",ip.data(),msg.data());
+        _logger->log("IP: %s MSG: %s\n",ip.data(),msg.data());
 
-        try
-        {
-            /* try to find valid IO*/
-            // auto &peer = find(ip,fd);
-            // peer.write(msg.data(),msg.size());
-            
+
             bool res{};
             for ( int i=0; i< _peer.size() && res==false ; i++)
             {
-                res=_peer[i].get()->request(ip,port,fd,std::tuple<query>(request,msg));
+                res=_peer[i].get()->request(ip,port,fd, notification,msg);
             }
             if (!res)
             {
                 /* peer did not found*/
                 _peer.emplace_back(std::make_unique<IO>(ip,port,*this));
             }
-            
-
-        }
-        catch(const std::exception& e)
-        {
-            std::cerr << e.what() << '\n';
-        }
         
     }
 
-    template<typename... Args>
-    IO &EndPoint::find(Args... args)
-    {
-        for (auto &io : _peer)
-        {
+    // template<typename... Args>
+    // IO &EndPoint::find(Args... args)
+    // {
+    //     for (auto &io : _peer)
+    //     {
 
-            ([&] { 
-                    if constexpr (std::is_same_v<decltype(args), int>)
-                    {
-                        if (io() != 0 && io()==args) {return io;}
-                    }
-                    else
-                    if constexpr (std::is_same_v<decltype(args), std::string_view>)
-                    {
-                        if (!io.getIp().empty() && io.getIp()==args) {return io;}
-                    }
-                 }(), ...);
-        }
+    //         ([&] { 
+    //                 if constexpr (std::is_same_v<decltype(args), int>)
+    //                 {
+    //                     if (io() != 0 && io()==args) {return io;}
+    //                 }
+    //                 else
+    //                 if constexpr (std::is_same_v<decltype(args), std::string_view>)
+    //                 {
+    //                     if (!io.getIp().empty() && io.getIp()==args) {return io;}
+    //                 }
+    //              }(), ...);
+    //     }
         
-        throw std::out_of_range("File Descriptor not found");
-    }
+    //     throw std::out_of_range("File Descriptor not found");
+    // }
 
     // void EndPoint::accept(sockaddr *addr, socklen_t *addr_len)
     // {
@@ -272,7 +262,7 @@ namespace COM
     //     }
     // }
 
-    EndPoint::Epool::Epool()
+    EndPoint::Epool::Epool(ThreadSafeQueue<std::string> &queue)
     {
         _fd = epoll_create1(0);
         if (_fd == -1)
@@ -282,7 +272,7 @@ namespace COM
         }
 
         /* start off waiter thread*/
-        waiter = std::thread(&Epool::waiterFunction,this);
+        waiter = std::thread(&Epool::waiterFunction,this,queue);
     }
     EndPoint::Epool::~Epool()
     {
@@ -307,7 +297,7 @@ namespace COM
         return true;
     }
 
-    int EndPoint::Epool::waiterFunction()
+    int EndPoint::Epool::waiterFunction(ThreadSafeQueue<std::string> &queue)
     {
         struct epoll_event *events;
         /* clean container that stores events returned  by wait*/
@@ -322,7 +312,25 @@ namespace COM
             {
                 handle_error("epoll_wait");      
             }
+            for (size_t i = 0; i < wait; i++)
+            {
+                std::string fd ="-f "+ std::to_string(events[i].data.fd)+ " "; 
+                /* error or hang up happend */
+                if ((events[i].events & (EPOLLRDHUP | EPOLLERR | EPOLLHUP)) && 
+                (!(events[i].events & EPOLLIN))) /* TODO: some servers sends msg then close connection an 8193 is obtained should i close and  */
+                {
+                    fprintf (stderr, "epoll error. events=%u\n", events[i].events); //TODO: event string
 
+                    /* pass close request with file descriptor */
+                    queue.push(fd+"-c");
+	                continue;
+                }
+                else
+                {
+                    /* pass read request with file descriptor */
+                    queue.push(fd+"-r");
+                }
+            }
         }
         return 0;
     }

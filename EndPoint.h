@@ -31,12 +31,12 @@ namespace COM
     public:
         EndPoint (std::string_view ip, uint16_t port, ThreadSafeQueue<std::string> &queue, ILog* logger = &emptyLogger, IDB* db = &emptyDB);
         ~EndPoint ();
-        bool appendPeer(int fd, uint32_t param) override;
+        bool appendNotificationNode(int fd, uint32_t param) override;
         void addPeer(std::string_view ip, std::string_view port, bool ssl);
-        template<typename... Args>
-        IO& find(Args... args);
+        // template<typename... Args>
+        // IO& find(Args... args);
         // void accept (sockaddr *addr, socklen_t *addr_len);
-        EmptyDB a; //should not build, try to create only one instance of it
+        // EmptyDB a; //should not build, try to create only one instance of it
     };
 
     class EndPoint::Epool
@@ -45,9 +45,9 @@ namespace COM
     private:
         int _fd = CLOSED; /* epool file descriptor */
         std::thread waiter; /* provides events to file descriptors */
-        int waiterFunction();
+        int waiterFunction(ThreadSafeQueue<std::string> &queue);
     public:
-        Epool();
+        Epool(ThreadSafeQueue<std::string> &queue);
         ~Epool();
         int operator()() {return _fd;}
         bool addNew(int fd, uint32_t param);

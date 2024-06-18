@@ -11,7 +11,7 @@
 #include <sys/epoll.h> //epoll
 #include <signal.h> //signal
 #include <mqueue.h> //mq
-
+#include <charconv> //std::from_chars
 #include "EndPoint.h"
 
 // constexpr auto MAXEVENTS = 64;
@@ -81,7 +81,8 @@ void new_msg_queue(union sigval sv)
 int main(int argc, char *argv[])
 {
     int ret;
-    std::string_view ip, port;
+    std::string_view ip;
+    uint16_t port;
     bool with_tls = false;
     bool test_timer = false;
 
@@ -220,7 +221,8 @@ regions of the same file.*/
 
         case 'p':
           printf ("option -p with value `%s'\n", optarg);
-          port = optarg;
+          std::from_chars(optarg,optarg+ std::strlen(optarg),port);
+        //   port = optarg;
           break;
         }
     }
@@ -241,262 +243,262 @@ regions of the same file.*/
     /* create client instance */
     COM::EndPoint client(ip,port,queue);
 
-    while (!client.connect())
-    {
-        sleep(2); // try again after a while
-    }
+    // while (!client.connect())
+    // {
+    //     sleep(2); // try again after a while
+    // }
    
 
-    //epoll interface
-    auto epoll_fd = epoll_create1(0);
-    if (epoll_fd == -1)
-    {
-        closeFd(client());
-        handle_error("epoll_create1", true);      
-    }
+    // //epoll interface
+    // auto epoll_fd = epoll_create1(0);
+    // if (epoll_fd == -1)
+    // {
+    //     closeFd(client());
+    //     handle_error("epoll_create1", true);      
+    // }
 
-    /* setup event for client socket*/
-    struct epoll_event event;
+    // /* setup event for client socket*/
+    // struct epoll_event event;
 
-    event.data.fd = client();
-    event.events = EPOLLIN | EPOLLET  | EPOLLRDHUP; /* edge-triggered read able to detect peer shutdown */
+    // event.data.fd = client();
+    // event.events = EPOLLIN | EPOLLET  | EPOLLRDHUP; /* edge-triggered read able to detect peer shutdown */
 
-    /*  Add an entry to the interest list of the epoll file descriptor, fd_epoll */
-    ret = epoll_ctl(epoll_fd, EPOLL_CTL_ADD ,client(), &event);
-    if (ret == -1)
-    {
-        client.close();
-        closeFd(epoll_fd);
-        handle_error("epoll_ctl_client", true);      
-    }
+    // /*  Add an entry to the interest list of the epoll file descriptor, fd_epoll */
+    // ret = epoll_ctl(epoll_fd, EPOLL_CTL_ADD ,client(), &event);
+    // if (ret == -1)
+    // {
+    //     client.close();
+    //     closeFd(epoll_fd);
+    //     handle_error("epoll_ctl_client", true);      
+    // }
 
-    /* initialize timer to write with determined interval */
-    int timer_fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
-	if (timer_fd == -1) 
-    {
-        client.close();
-        closeFd(epoll_fd);
-		handle_error("timerfd_create", true);
-	}
+    // /* initialize timer to write with determined interval */
+    // int timer_fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
+	// if (timer_fd == -1) 
+    // {
+    //     client.close();
+    //     closeFd(epoll_fd);
+	// 	handle_error("timerfd_create", true);
+	// }
 
-    struct itimerspec ts = {0};
-    int interval = test_timer ? 10 : 0; 
-    int startup = test_timer ? 5 : 0;  
-    ts.it_interval.tv_sec = interval;
-	ts.it_value.tv_sec = startup;
+    // struct itimerspec ts = {0};
+    // int interval = test_timer ? 10 : 0; 
+    // int startup = test_timer ? 5 : 0;  
+    // ts.it_interval.tv_sec = interval;
+	// ts.it_value.tv_sec = startup;
 
-    if (timerfd_settime(timer_fd, TFD_TIMER_ABSTIME, &ts, NULL) == -1)
-    {
-        client.close();
-        closeFd(timer_fd);
-        closeFd(epoll_fd);
-		handle_error("timerfd_create", true);
-    }
+    // if (timerfd_settime(timer_fd, TFD_TIMER_ABSTIME, &ts, NULL) == -1)
+    // {
+    //     client.close();
+    //     closeFd(timer_fd);
+    //     closeFd(epoll_fd);
+	// 	handle_error("timerfd_create", true);
+    // }
 
-    /* clear before again usage */
-    std::memset(&event, 0, sizeof(struct epoll_event));
+    // /* clear before again usage */
+    // std::memset(&event, 0, sizeof(struct epoll_event));
 
-    event.data.fd = timer_fd;
-    event.events = EPOLLIN | EPOLLET; /* edge-triggered read */
+    // event.data.fd = timer_fd;
+    // event.events = EPOLLIN | EPOLLET; /* edge-triggered read */
 
-    /*  Add an entry to the interest list of the epoll file descriptor, fd_epoll */
-    ret = epoll_ctl(epoll_fd, EPOLL_CTL_ADD ,timer_fd, &event);
-    if (ret == -1)
-    {
-        client.close();
-        closeFd(timer_fd);
-        closeFd(epoll_fd);
-        handle_error("epoll_ctl_timer", true);      
-    }
+    // /*  Add an entry to the interest list of the epoll file descriptor, fd_epoll */
+    // ret = epoll_ctl(epoll_fd, EPOLL_CTL_ADD ,timer_fd, &event);
+    // if (ret == -1)
+    // {
+    //     client.close();
+    //     closeFd(timer_fd);
+    //     closeFd(epoll_fd);
+    //     handle_error("epoll_ctl_timer", true);      
+    // }
 
-    struct epoll_event *events;
-    /* clean Buffer where events are returned */
-    events = (struct epoll_event*)  calloc (MAXEVENTS, sizeof event);
+    // struct epoll_event *events;
+    // /* clean Buffer where events are returned */
+    // events = (struct epoll_event*)  calloc (MAXEVENTS, sizeof event);
 
-    while (1)
-    {    
-        char buf[MAX_READ]={0};
-        auto wait = epoll_wait(epoll_fd, events, MAXEVENTS, -1); //wait infinite time for events
-        if (wait == -1)
-        {
-            client.close();
-            closeFd(timer_fd);
-            closeFd(epoll_fd);
-            handle_error("epoll_wait",true);      
-        }
-        for (size_t i = 0; i < wait; i++)
-        {   
+    // while (1)
+    // {    
+    //     char buf[MAX_READ]={0};
+    //     auto wait = epoll_wait(epoll_fd, events, MAXEVENTS, -1); //wait infinite time for events
+    //     if (wait == -1)
+    //     {
+    //         client.close();
+    //         closeFd(timer_fd);
+    //         closeFd(epoll_fd);
+    //         handle_error("epoll_wait",true);      
+    //     }
+    //     for (size_t i = 0; i < wait; i++)
+    //     {   
 
-            std::printf("epoll event: %u\n",events[i].events);
+    //         std::printf("epoll event: %u\n",events[i].events);
 
-            //TODO: search from list of EndPoint's to find events[i].data.fd, if not in list then different type fd
+    //         //TODO: search from list of EndPoint's to find events[i].data.fd, if not in list then different type fd
 
-            /* error or hang up happend */
-            if ((events[i].events & (EPOLLRDHUP | EPOLLERR | EPOLLHUP)) && 
-                (!(events[i].events & EPOLLIN))) /* TODO: some servers sends msg then close connection an 8193 is obtained should i close and  */
-            {
-                fprintf (stderr, "epoll error. events=%u\n", events[i].events); //TODO: event string
+    //         /* error or hang up happend */
+    //         if ((events[i].events & (EPOLLRDHUP | EPOLLERR | EPOLLHUP)) && 
+    //             (!(events[i].events & EPOLLIN))) /* TODO: some servers sends msg then close connection an 8193 is obtained should i close and  */
+    //         {
+    //             fprintf (stderr, "epoll error. events=%u\n", events[i].events); //TODO: event string
 
-                if (events[i].data.fd == client())
-                {
-                    client.close();
-                }
-                else
-                {
-                    closeFd(events[i].data.fd);
-                }
+    //             if (events[i].data.fd == client())
+    //             {
+    //                 client.close();
+    //             }
+    //             else
+    //             {
+    //                 closeFd(events[i].data.fd);
+    //             }
                 
                 
-	            continue;
-            }
-            else
-            if (timer_fd == events[i].data.fd)
-            {
-                while (1)
-                {
-                    uint64_t expirations;
-                    ret = read(timer_fd, &expirations, sizeof(uint64_t));
-                    if (ret == -1)
-                    {
-                        if (errno != EAGAIN)
-                        {
-                            handle_error("read",true);
-                        }
-                        else
-                        { 
-                            // std::cout<<"another read call after timer expiration\n";
-                            break;
-                        }                     
-                    }
-                    else
-                    if (ret != sizeof(uint64_t))
-                    {
-                        client.close();
-                        closeFd(timer_fd);
-                        closeFd(epoll_fd);
-                        handle_error("read_timer",true); 
-                    }
-                    else
-                    {
-                        std::cout<<expirations << " timer expiration\n";
+	//             continue;
+    //         }
+    //         else
+    //         if (timer_fd == events[i].data.fd)
+    //         {
+    //             while (1)
+    //             {
+    //                 uint64_t expirations;
+    //                 ret = read(timer_fd, &expirations, sizeof(uint64_t));
+    //                 if (ret == -1)
+    //                 {
+    //                     if (errno != EAGAIN)
+    //                     {
+    //                         handle_error("read",true);
+    //                     }
+    //                     else
+    //                     { 
+    //                         // std::cout<<"another read call after timer expiration\n";
+    //                         break;
+    //                     }                     
+    //                 }
+    //                 else
+    //                 if (ret != sizeof(uint64_t))
+    //                 {
+    //                     client.close();
+    //                     closeFd(timer_fd);
+    //                     closeFd(epoll_fd);
+    //                     handle_error("read_timer",true); 
+    //                 }
+    //                 else
+    //                 {
+    //                     std::cout<<expirations << " timer expiration\n";
 
-                        std::string msg("Expiration: ");
+    //                     std::string msg("Expiration: ");
 
-                        if (client() != CLOSED)
-                        {
-                            ret = write(client(), msg.c_str(), msg.size());
-                            if (ret == -1)
-                            {
-                                if (errno != EAGAIN)
-                                {
-                                    client.close();
-                                    handle_error("write");
-                                } 
-                            }                  
-                            else
-                            if (ret != msg.size())
-                            {
-                                std::cout<<"different amnt of written bytes: "<<ret <<",in comparison to msg: "<<sizeof(uint64_t)<<"\n";
-                            }
-                        }                        
-                    }
-                }  
-            }            
-            else
-            {
-              /* We have data on the fd waiting to be read. Read and
-               * display it. We must read whatever data is available
-               * completely, as we are running in edge-triggered mode
-               * and won't get a notification again for the same
-               * data. */
+    //                     if (client() != CLOSED)
+    //                     {
+    //                         ret = write(client(), msg.c_str(), msg.size());
+    //                         if (ret == -1)
+    //                         {
+    //                             if (errno != EAGAIN)
+    //                             {
+    //                                 client.close();
+    //                                 handle_error("write");
+    //                             } 
+    //                         }                  
+    //                         else
+    //                         if (ret != msg.size())
+    //                         {
+    //                             std::cout<<"different amnt of written bytes: "<<ret <<",in comparison to msg: "<<sizeof(uint64_t)<<"\n";
+    //                         }
+    //                     }                        
+    //                 }
+    //             }  
+    //         }            
+    //         else
+    //         {
+    //           /* We have data on the fd waiting to be read. Read and
+    //            * display it. We must read whatever data is available
+    //            * completely, as we are running in edge-triggered mode
+    //            * and won't get a notification again for the same
+    //            * data. */
 
-                if (events[i].data.fd != client())
-                {
-                    throw std::runtime_error("Only client should appears here");
-                }
+    //             if (events[i].data.fd != client())
+    //             {
+    //                 throw std::runtime_error("Only client should appears here");
+    //             }
               
 
-              /* connection has been closed */
-              auto drop_connection = (events[i].events & (EPOLLRDHUP | EPOLLERR | EPOLLHUP)) ? true : false;
-              int all_reads=0;
-              while (1)
-              {
+    //           /* connection has been closed */
+    //           auto drop_connection = (events[i].events & (EPOLLRDHUP | EPOLLERR | EPOLLHUP)) ? true : false;
+    //           int all_reads=0;
+    //           while (1)
+    //           {
                 
-                ret = client.read(buf,sizeof buf); 
-                if (ret == -1)
-                {   
-                    /* If errno == EAGAIN, that means we have read all
-                    data. So go back to the main loop. */
-                    std::printf("not more data available, read %u bytes\n",all_reads);
-                    break;
-                }           
-                else
-                if (ret == 0)
-                {
-                    /* End of file. The remote has closed the
-                    * connection. */
-                    //OR
-                    /* Error during reading */
-                    drop_connection = true;
-                    break;
-                }
-                else
-                {
-                    /* Successful read*/
+    //             ret = client.read(buf,sizeof buf); 
+    //             if (ret == -1)
+    //             {   
+    //                 /* If errno == EAGAIN, that means we have read all
+    //                 data. So go back to the main loop. */
+    //                 std::printf("not more data available, read %u bytes\n",all_reads);
+    //                 break;
+    //             }           
+    //             else
+    //             if (ret == 0)
+    //             {
+    //                 /* End of file. The remote has closed the
+    //                 * connection. */
+    //                 //OR
+    //                 /* Error during reading */
+    //                 drop_connection = true;
+    //                 break;
+    //             }
+    //             else
+    //             {
+    //                 /* Successful read*/
 
-                    /* TODO: why I put it here */
-                    if (buf[ret-1]=='\n')
-                    {
-                      buf[ret-1]='\0';
-                    }
+    //                 /* TODO: why I put it here */
+    //                 if (buf[ret-1]=='\n')
+    //                 {
+    //                   buf[ret-1]='\0';
+    //                 }
                   
-                    std::cout<<"Received: "<<ret<<" bytes from fd: "<<client()<<"\n";
-                    std::printf("%s\n",buf);
+    //                 std::cout<<"Received: "<<ret<<" bytes from fd: "<<client()<<"\n";
+    //                 std::printf("%s\n",buf);
                     
-                    // break;
+    //                 // break;
                       
-                  all_reads+= ret;
-                }
-              }
+    //               all_reads+= ret;
+    //             }
+    //           }
 
-                if (drop_connection)
-                {
-                    std::cout<<"Dropped connection on fd: "<< client()<< "\n";
-                    /* Closing the descriptor will make epoll remove it
-                     * from the set of descriptors which are monitored. */
-                    client.close();
-                }
+    //             if (drop_connection)
+    //             {
+    //                 std::cout<<"Dropped connection on fd: "<< client()<< "\n";
+    //                 /* Closing the descriptor will make epoll remove it
+    //                  * from the set of descriptors which are monitored. */
+    //                 client.close();
+    //             }
               
               
-            }
-        }
+    //         }
+    //     }
 
-        while (client() == CLOSED)
-        {
-            sleep(5);
-            client.connect();
+    //     while (client() == CLOSED)
+    //     {
+    //         sleep(5);
+    //         client.connect();
 
-            if(client() == CLOSED)
-            {continue;}
+    //         if(client() == CLOSED)
+    //         {continue;}
 
 
-            /* clear before again usage */
-            std::memset(&event, 0, sizeof(struct epoll_event));
+    //         /* clear before again usage */
+    //         std::memset(&event, 0, sizeof(struct epoll_event));
 
-            event.data.fd = client();
-            event.events = EPOLLIN | EPOLLET  | EPOLLRDHUP; /* edge-triggered read able to detect peer shutdown */
+    //         event.data.fd = client();
+    //         event.events = EPOLLIN | EPOLLET  | EPOLLRDHUP; /* edge-triggered read able to detect peer shutdown */
 
-            /*  Add an entry to the interest list of the epoll file descriptor, fd_epoll */
-            ret = epoll_ctl(epoll_fd, EPOLL_CTL_ADD ,client(), &event);
-            if (ret == -1)
-            {
-                client.close();
-                closeFd(epoll_fd);
-                handle_error("epoll_ctl_client", true);      
-            }
-        }
+    //         /*  Add an entry to the interest list of the epoll file descriptor, fd_epoll */
+    //         ret = epoll_ctl(epoll_fd, EPOLL_CTL_ADD ,client(), &event);
+    //         if (ret == -1)
+    //         {
+    //             client.close();
+    //             closeFd(epoll_fd);
+    //             handle_error("epoll_ctl_client", true);      
+    //         }
+    //     }
 
         
-    }
+    // }
     
 }

@@ -30,7 +30,7 @@ namespace COM
             _tls.create_object();
         }
     }
-    bool IO::request(std::string_view ip, uint16_t port, int fd, query &item)
+    bool IO::request(std::string_view ip, uint16_t port, int fd, req request, std::string msg /*query &item*/)
     {
         //TODO: make in the future only one instance that handle read/write/close/connect/ with list of available masters state/ip/port/fd
         //try to create it
@@ -46,7 +46,7 @@ namespace COM
         )
         {
             /* forward request and potential message*/
-            _que.push(item);
+            _que.push(std::make_tuple(request,msg ));
         }
         
         return false;
@@ -331,7 +331,7 @@ namespace COM
                     {
                         /* Successful read*/
                         all_reads+= res;
-                        _logger->log(); //TODO: create logger
+                        _logger->log(""); //TODO: create logger
                         _db->set(0,0); //TODO: update DB
                         // logger/callback_to_update_db
                     }                   
