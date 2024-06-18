@@ -5,7 +5,7 @@
 #include "ILog.h"
 #include "IDB.h"
 
-#include "EmptyImplementation.h"
+
 
 constexpr auto CLOSED = -1;
 enum class req {CONNECT, CLOSE, WRITE, READ};
@@ -27,7 +27,7 @@ protected:
         _manager->appendNotificationNode(_fd);
     };
 public:
-    IPeer(IManager* manager, ILog* logger = &emptyLogger, IDB* db = &emptyDB) : _manager(manager), _logger(logger), _db(db){};
+    IPeer(IManager* manager, ILog* logger, IDB* db) : _manager(manager), _logger(logger), _db(db){};
     virtual bool request(std::string_view ip, uint16_t port, int fd,  req request, std::string msg ) = 0;
     virtual ~IPeer() = default;
 };

@@ -1,5 +1,8 @@
 #pragma once
 
+#include <memory> //std::make_unique
+#include <cstdio> //std::snprintf
+
 class ILog
 {
 private:

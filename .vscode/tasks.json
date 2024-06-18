@@ -6,11 +6,13 @@
 			"label": "C/C++: g++ build active file",
 			"command": "/usr/bin/g++",
 			"args": [
+				// "-std=c++17",
 				"-fdiagnostics-color=always",
 				"-g",
 				"${fileDirname}/main.cpp",
 				"${fileDirname}/EndPoint.cpp",
 				"${fileDirname}/TLS.cpp",
+				"${fileDirname}/IO.cpp",
 				"-I${fileDirname}",
 				"-I/usr/include/openssl", // OpenSSL include directory
 				"-L/usr/lib", // General library directory

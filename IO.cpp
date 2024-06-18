@@ -17,7 +17,7 @@ static int closeFd(int &fileDescriptor)
 
 namespace COM
 {
-    IO::IO(std::string_view ip, uint16_t port, bool ssl, IManager* manager, ILog* logger, IDB* db) : IPeer(manager), _locIp{ip}, _locPort{port}
+    IO::IO(std::string_view ip, uint16_t port, bool ssl, IManager* manager, ILog* logger, IDB* db) : IPeer(manager,logger,db), _locIp{ip}, _locPort{port}
     {
         if (ssl)
         {
@@ -50,10 +50,6 @@ namespace COM
         }
         
         return false;
-    }
-
-    IO::~IO()
-    {
     }
 
     int IO::connectTCP()

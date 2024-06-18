@@ -1,5 +1,4 @@
 #include "EndPoint.h"
-#include "IPeer.h"
 #include "IO.h"
 
 #include <stdexcept> // for std::out_of_range
@@ -9,8 +8,6 @@
 #include <charconv> //std::from_chars
 #include <regex>
 #include <tuple>
-
-
 
 struct addrTCP
 {
@@ -38,11 +35,13 @@ static addrTCP validateAddrTCP(std::string_view addr, ILog* logger = &emptyLogge
         logger->log("not valid port in address %s\n",std::string(addr.data()+portSep+1,addr.data()+addr.size()).data());
         return {"",0}; 
     }
-
+    
+    /* seperate ip from whole address */
+    std::string ip=std::string(addr.begin(),addr.begin()+portSep);
 
     std::regex pattern("\\.");
     std::vector<std::string> tokens(
-    std::sregex_token_iterator(addr.begin(), addr.begin() + portSep, pattern, -1),
+    std::sregex_token_iterator(ip.begin(), ip.begin() + ip.size(), pattern, -1),
     std::sregex_token_iterator()
     );
 
@@ -64,7 +63,7 @@ static addrTCP validateAddrTCP(std::string_view addr, ILog* logger = &emptyLogge
         idx++;
     }
 
-    return {std::string(addr.begin(),addr.begin()+portSep),port};
+    return {ip,port};
 }
 
 namespace COM
@@ -79,7 +78,7 @@ namespace COM
     EndPoint::EndPoint(std::string_view ip, uint16_t port, ThreadSafeQueue<std::string> &queue,ILog* logger, IDB* db) : _logger(logger), _db(db)
     {
         /* create new Peer */
-        _peer.emplace_back(std::make_unique<IO>(ip,port,*this));
+        _peer.emplace_back(std::make_unique<IO>(ip,port,false,this,_logger,_db));
 
         // stdIN = std::thread(&EndPoint::stdINLoop,this,queue);
         /* wait for new message */
@@ -194,7 +193,7 @@ namespace COM
             if (!res)
             {
                 /* peer did not found*/
-                _peer.emplace_back(std::make_unique<IO>(ip,port,*this));
+                _peer.emplace_back(std::make_unique<IO>(ip,port,false,this,_logger,_db));
             }
         
     }
@@ -272,7 +271,7 @@ namespace COM
         }
 
         /* start off waiter thread*/
-        waiter = std::thread(&Epool::waiterFunction,this,queue);
+        waiter = std::thread(&Epool::waiterFunction,this,std::ref(queue)); //Directly passing queue will attempt to copy it
     }
     EndPoint::Epool::~Epool()
     {

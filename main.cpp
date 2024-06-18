@@ -14,8 +14,12 @@
 #include <charconv> //std::from_chars
 #include "EndPoint.h"
 
-// constexpr auto MAXEVENTS = 64;
-// constexpr int MAX_READ = 2048;
+//TODO: move to better place
+static void handle_error(const char* msg, bool exit_proc=false)
+{
+    perror(msg); 
+    if(exit_proc) {exit(EXIT_FAILURE);}
+};
 
 constexpr auto mq_name="/mq_client";
 

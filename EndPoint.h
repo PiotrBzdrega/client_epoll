@@ -5,6 +5,7 @@
 #include <thread>
 
 #include "IPeer.h"
+#include "EmptyImplementation.h"
 #include "IManager.h"
 
 #include "ThreadSafeQueue.h"
