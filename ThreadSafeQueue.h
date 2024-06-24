@@ -24,6 +24,9 @@ namespace COM
 
             /* push new value at the end of que if exclusive access available */
             que.push_back(new_value);
+
+            /* let know other thread that smth new appears*/
+            cv.notify_one();
         }
         void push_front(const T &new_value)
         {
@@ -32,6 +35,9 @@ namespace COM
 
             /* push new value at the first position if exclusive access available */
             que.push_front(new_value);
+
+            /* let know other thread that smth new appears*/
+            cv.notify_one();
         }
         std::shared_ptr<T> pop()
         {   

@@ -9,9 +9,10 @@
             // "args": ["-ichallenge01.root-me.org" ,"-p52002"],
             // "args": ["-i172.22.77.70","-p3490", "--ssl"],
             // "args": ["-i172.22.77.70","-p3490", "--timer"],
-            "args": ["-i18.189.209.142","-p36981 "],
+            "args": ["-i172.22.77.70","-p36981 "], //local
+            // "args": ["-i 18.189.209.142:21135"], //pico
             // "args": ["-iwww.openssl.org", "-p443"],
-            "stopAtEntry": true,
+            "stopAtEntry": false,
             "cwd": "${fileDirname}",
             "environment": [],
             "externalConsole": false,

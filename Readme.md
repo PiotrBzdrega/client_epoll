@@ -1,8 +1,9 @@
+- first instance must also handle ip:port argument
+- Add Logger , Add DB
 - PoolThread, each peer should have own 
 - request can have write/read/close/connect
 - if local contains ip or port then bind
 - Peer is in this case server, we need to store peers in vector
 - Peer should have own loop that will be returned if no comming request NONE, CONNECT, CLOSE, SEND, READ
 - IO should communicate with peer through IPEER (pass request and msg)
-- Add Logger , Add DB
 - add version

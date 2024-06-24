@@ -64,7 +64,10 @@ void new_msg_queue(union sigval sv)
     //received byte count
     ssize_t rcv = mq_receive(mqdes, buf, attr.mq_msgsize, NULL);
     if (rcv == -1)
+    {
         handle_error("mq_receive");
+    }
+        
 
     /* returned array could not have null terminator*/
     buf[rcv]='\0';
@@ -92,8 +95,10 @@ int main(int argc, char *argv[])
 
     mqd_t mqdes;
     /* create if do not exist */
-    int pid_file = open("/var/run/client.pid", O_CREAT | O_RDWR, 0666); //The return value is a file descriptor
-
+    int pid_file = open("/var/run/client.pid", O_CREAT | O_RDWR, 0666);
+    if (pid_file == -1) {
+        handle_error("open",true);
+    }
 /*The fcntl() system call provides record
 locking, allowing processes to place multiple read and write locks on different
 regions of the same file.*/
@@ -111,27 +116,7 @@ regions of the same file.*/
     
     if(rc) 
     {
-        /* Another instance */
-
-        std::printf("Read arguments:\n");
-        for (size_t i = 0; i < argc; i++)
-        {
-           std::printf("%s\t",argv[i]);
-        }
-        std::printf("\n");
-        
-        // Open the message queue for sending
-        mqdes = mq_open(mq_name, O_WRONLY);
-        if (mqdes == (mqd_t)-1) {
-            handle_error("mq_open");
-        }
-
-        std::printf("sizeof(%s) = %ld\n",argv[argc-1], strlen(argv[argc-1]));
-
-        if (mq_send(mqdes, argv[argc-1], strlen(argv[argc-1]), 0) == -1) 
-        {
-            handle_error("mq_send");
-        }
+        /* Another instance, file already locked*/
 
         std::cout<<"errno: "<<strerror(errno)<<"\n";
         if(EWOULDBLOCK == errno)
@@ -140,9 +125,46 @@ regions of the same file.*/
 
             int rc = fcntl(pid_file, F_GETLK, &fl); //Get record locking info
             std::cout<<"\033[0;91m Process ID of the process that holds the blocking lock "<<fl.l_pid<<"\033[0m\n";       
-
-            exit(EXIT_SUCCESS);
         }
+        else
+        {
+            exit(EXIT_FAILURE);
+        }
+
+        std::printf("Read arguments:\n");
+        for (size_t i = 0; i < argc; i++)
+        {
+           std::printf("%s\t",argv[i]);
+        }
+        std::printf("\n");
+        
+        if (argc<2)
+        {
+            std::printf("Missing valid arguments\n");
+            exit(EXIT_FAILURE);
+        }
+        
+        auto begin = argv[1];
+        auto size_last_arg = strlen(argv[argc-1]);
+        auto end = argv[argc-1];
+        end += size_last_arg;
+        std::string_view request(begin,end-begin);
+        check if we pass correctly without spaces between -i 12532u5032:23423
+        // Open the message queue for sending
+        mqdes = mq_open(mq_name, O_WRONLY);
+        if (mqdes == (mqd_t)-1) {
+            handle_error("mq_open",true);
+        }
+        
+        std::printf("sizeof(%s) = %ld\n",argv[argc-1], strlen(argv[argc-1]));
+
+        // if (mq_send(mqdes, argv[argc-1], strlen(argv[argc-1]), 0) == -1) 
+        if (mq_send(mqdes, request.data(), request.size(), 0) == -1) 
+        {
+            handle_error("mq_send",true);
+        }
+
+        exit(EXIT_SUCCESS);
     }
     else
     {
@@ -150,7 +172,7 @@ regions of the same file.*/
         mqdes = mq_open(mq_name,O_RDONLY | O_CREAT | O_NONBLOCK /* | O_EXCL */,0600,NULL);
         if (mqdes == (mqd_t) -1)
         {
-            handle_error("mq_open");
+            handle_error("mq_open",true);
         }
 
         struct sigevent sev;
@@ -162,21 +184,21 @@ regions of the same file.*/
         /* register a notification request for the message queue */
         if (mq_notify(mqdes, &sev) == -1)
         {
-            handle_error("mq_notify");
+            handle_error("mq_notify",true);
         }
 
         /* clean mq in case of previous remains ,notification won't be rised in case of non-empty queue*/
         struct mq_attr attr;
         if (mq_getattr(mqdes, &attr) == -1)
         {
-            handle_error("mq_getattr");
+            handle_error("mq_getattr",true);
         }    
 
         char *emp_buf;
         emp_buf = (char*)malloc(attr.mq_msgsize); //Maximum message size
         if (emp_buf == NULL)
         {
-            handle_error("malloc");
+            handle_error("malloc",true);
         }
         while(mq_receive(mqdes, emp_buf, attr.mq_msgsize, 0) >= 0)
         {
@@ -504,5 +526,8 @@ regions of the same file.*/
 
         
     // }
-    
+    while(1)
+    {
+        sleep(100000);
+    }
 }
