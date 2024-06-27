@@ -19,7 +19,7 @@ private:
 protected:
     std::string _ip;
     uint16_t _port;
-    int _fd = CLOSED; /* endpoint file descriptor */
+    int _fd{CLOSED}; /* endpoint file descriptor */
     ILog* _logger; 
     IDB* _db;
     void notifyManager()

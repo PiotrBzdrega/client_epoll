@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 #include <cstring> // std::memset
+#include <algorithm> // std::replace
 
 #include <sys/socket.h> //connect, bind
 #include <unistd.h> //close, read, write
@@ -67,22 +68,21 @@ void new_msg_queue(union sigval sv)
     {
         handle_error("mq_receive");
     }
-        
 
     /* returned array could not have null terminator*/
     buf[rcv]='\0';
 
     /* even if buffer is released (free()), malloc can allocate same area in next msg; there is no \0 character at the end, so rcv len must be took into account for format %.*s*/
     std::printf("Read %zd bytes from MQ %s: %s\n", rcv, mq_name, buf);
-    int ret = std::strcmp("exit",buf);
+    // int ret = std::strcmp("exit",buf);
 
     /* push new data into queue */
     queue.push(buf);
     free(buf);
-    if (ret == 0)
-    {
-        exit(EXIT_SUCCESS);         /* Terminate the process */
-    }
+    // if (ret == 0)
+    // {
+    //     exit(EXIT_SUCCESS);         /* Terminate the process */
+    // }
 }
 
 int main(int argc, char *argv[])
@@ -148,18 +148,22 @@ regions of the same file.*/
         auto size_last_arg = strlen(argv[argc-1]);
         auto end = argv[argc-1];
         end += size_last_arg;
-        std::string_view request(begin,end-begin);
-        check if we pass correctly without spaces between -i 12532u5032:23423
+        std::string buffer(begin,end-begin);
+        std::replace(buffer.begin(),buffer.end(),'\0',' ');
+
+        std::string_view request(buffer);
+
+        // check if we pass correctly without spaces between -i 12532u5032:23423
         // Open the message queue for sending
         mqdes = mq_open(mq_name, O_WRONLY);
         if (mqdes == (mqd_t)-1) {
             handle_error("mq_open",true);
         }
         
-        std::printf("sizeof(%s) = %ld\n",argv[argc-1], strlen(argv[argc-1]));
+        std::printf("sizeof(%s) = %ld\n",buffer.data(), strlen(buffer.data()));
 
         // if (mq_send(mqdes, argv[argc-1], strlen(argv[argc-1]), 0) == -1) 
-        if (mq_send(mqdes, request.data(), request.size(), 0) == -1) 
+        if (mq_send(mqdes, buffer.data(), buffer.size(), 0) == -1) 
         {
             handle_error("mq_send",true);
         }

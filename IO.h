@@ -35,6 +35,7 @@ namespace COM
         ThreadSafeQueue<query> _que;
     public:
         IO(std::string_view ip, uint16_t port, bool ssl, IManager* manager, ILog* logger, IDB* db);
+        ~IO();
         // int operator()() {return _fd;}
         bool request(std::string_view ip, uint16_t port, int fd,  req request, std::string msg ) override;
         const std::string_view getIp() {return _locIp;}

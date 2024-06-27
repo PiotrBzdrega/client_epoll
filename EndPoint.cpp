@@ -15,7 +15,7 @@ struct addrTCP
     uint16_t port;
 
     bool
-    isEmpty() const{ return port && !ip.empty() ;}
+    isEmpty() const{ return !port && ip.empty() ;}
 };
 
 static addrTCP validateAddrTCP(std::string_view addr, ILog* logger = &emptyLogger)
@@ -116,9 +116,9 @@ namespace COM
         std::istringstream iss(*arg);
         std::string_view opt;
 	    std::string word;
-        std::string_view ip; /*-i*/
-        int fd; /*-f*/
-        uint16_t port;
+        std::string ip; /*-i*/
+        int fd{CLOSED}; /*-f*/
+        uint16_t port{};
         std::string msg; /*-m*/
 	    while (iss >> word )
         {
@@ -127,7 +127,9 @@ namespace COM
                 /* IP */
                 if (iss >> word )
                 {
-                    auto [ip,port] =validateAddrTCP(word,_logger);
+                    addrTCP addr = validateAddrTCP(word,_logger);
+                    ip=addr.ip; shit ip is returned here: "\360\323\377\377\377\177\000\000\213eVUUU"
+                    port=addr.port;
                 }
                 else
                 {
@@ -171,6 +173,7 @@ namespace COM
                 /* READ */
                 notification = req::READ;
             }
+            else
             if (word=="-c")
             {
                 /* CLOSE */
@@ -189,6 +192,11 @@ namespace COM
             for ( int i=0; i< _peer.size() && res==false ; i++)
             {
                 res=_peer[i].get()->request(ip,port,fd, notification,msg);
+                if(res)
+                {
+                    /* only one master has same address*/
+                    break;
+                }
             }
             if (!res)
             {

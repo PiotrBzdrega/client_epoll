@@ -29,6 +29,11 @@ namespace COM
             /* create object representing TLS connection */
             _tls.create_object();
         }
+        servant=std::thread(&IO::threadFunc,this);
+    }
+    IO::~IO()
+    {
+        if(servant.joinable()) {servant.join();}
     }
     bool IO::request(std::string_view ip, uint16_t port, int fd, req request, std::string msg /*query &item*/)
     {
@@ -42,11 +47,13 @@ namespace COM
 
         if ( ((!ip.empty() && ip == _ip && port !=0 && port==_port) || (fd != CLOSED && fd == _fd)) /* match with file descriptor or ip address*/
         ||
-            (!ip.empty() && port !=0 && _fd == CLOSED ) /* not initialized connection*/
+            (!ip.empty() && _ip.empty() && port != 0 && _port==0 && _fd == CLOSED && fd == _fd) /* not initialized connection*/
         )
         {
             /* forward request and potential message*/
             _que.push(std::make_tuple(request,msg ));
+
+            return true;
         }
         
         return false;
