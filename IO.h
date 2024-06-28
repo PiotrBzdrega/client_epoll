@@ -11,16 +11,10 @@
 #include <condition_variable>
 #include <tuple>
 
-constexpr auto MAX_READ = 2048;
-
-static void handle_error(const char* msg, bool exit_proc=false)
-{
-    perror(msg); 
-    if(exit_proc) {exit(EXIT_FAILURE);}
-};
-
 namespace COM
 {
+    constexpr auto MAX_READ = 2048;
+
     class IO : public IPeer
     {   
     private:

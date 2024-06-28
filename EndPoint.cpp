@@ -11,7 +11,7 @@
 
 struct addrTCP
 {
-    std::string_view ip;
+    std::string ip;
     uint16_t port;
 
     bool
@@ -26,14 +26,14 @@ static addrTCP validateAddrTCP(std::string_view addr, ILog* logger = &emptyLogge
     if(portSep == addr.npos)
     { 
         logger->log("Did not find : delimiter\n");
-        return {"",0}; 
+        return std::move(addrTCP{"",0}); 
     }
 
     if(std::from_chars(addr.data()+portSep+1,addr.data()+addr.size(),port).ec != std::errc() || !port )
     {
         /* wrong */
         logger->log("not valid port in address %s\n",std::string(addr.data()+portSep+1,addr.data()+addr.size()).data());
-        return {"",0}; 
+        return std::move(addrTCP{"",0}); 
     }
     
     /* seperate ip from whole address */
@@ -53,7 +53,7 @@ static addrTCP validateAddrTCP(std::string_view addr, ILog* logger = &emptyLogge
         if(std::from_chars(token.data(),token.data()+token.size(),octet[idx]).ec != std::errc() || (!idx && !octet[idx]) ) // first octet cannot have 0
         {
             logger->log("Invalid IP address element: %s\n",token.data());
-            return {"",0};
+            return std::move(addrTCP{"",port});
         }
         // else
         // {
@@ -63,7 +63,7 @@ static addrTCP validateAddrTCP(std::string_view addr, ILog* logger = &emptyLogge
         idx++;
     }
 
-    return {ip,port};
+    return std::move(addrTCP{ip,port});
 }
 
 namespace COM
@@ -75,7 +75,7 @@ namespace COM
 //TODO:        5. try maybe icmp before blind reconnect for training
 //TODO:        6. IO should contain waiting condition variable, EndPoint should keep lock as long as no request are comming
 
-    EndPoint::EndPoint(std::string_view ip, uint16_t port, ThreadSafeQueue<std::string> &queue,ILog* logger, IDB* db) : _logger(logger), _db(db)
+    EndPoint::EndPoint(std::string_view ip, uint16_t port, ThreadSafeQueue<std::string> &queue,ILog* logger, IDB* db) : _epoll(queue), _logger(logger), _db(db)
     {
         /* create new Peer */
         _peer.emplace_back(std::make_unique<IO>(ip,port,false,this,_logger,_db));
@@ -101,18 +101,16 @@ namespace COM
 
     bool EndPoint::appendNotificationNode(int fd, uint32_t param)
     {
-        return false;
+        return _epoll.addNew(fd, param);
     }
 
     void EndPoint::interpretRequest(std::shared_ptr<std::string> arg)
     {
-
-
         //-i 172.22.77.70:112 -m adam (write to ip)
         //-f 3 -r (read from file descriptor)
         //-f 4 -c (close file descriptor)
         //-i 172.22.77.70:2111 (connect with ip)
-        req notification;
+        req notification{};
         std::istringstream iss(*arg);
         std::string_view opt;
 	    std::string word;
@@ -128,14 +126,15 @@ namespace COM
                 if (iss >> word )
                 {
                     addrTCP addr = validateAddrTCP(word,_logger);
-                    ip=addr.ip; shit ip is returned here: "\360\323\377\377\377\177\000\000\213eVUUU"
+                    ip=addr.ip;
                     port=addr.port;
                 }
                 else
                 {
                     throw std::runtime_error("missing ip in arguments");
                 }         
-                notification = req::CONNECT;
+                /* connect by default */
+                // notification = req::CONNECT;
             }
             else
             if (word=="-f")
@@ -269,76 +268,4 @@ namespace COM
     //     }
     // }
 
-    EndPoint::Epool::Epool(ThreadSafeQueue<std::string> &queue)
-    {
-        _fd = epoll_create1(0);
-        if (_fd == -1)
-        {
-            handle_error("epoll_create1");
-            return;    
-        }
-
-        /* start off waiter thread*/
-        waiter = std::thread(&Epool::waiterFunction,this,std::ref(queue)); //Directly passing queue will attempt to copy it
-    }
-    EndPoint::Epool::~Epool()
-    {
-        if (waiter.joinable())
-        {
-            waiter.join();
-        }
-    }
-        bool EndPoint::Epool::addNew(int fd, uint32_t param)
-    {
-        /* setup event for client socket*/
-        struct epoll_event event;
-
-        event.data.fd = fd;
-        event.events = param;
-        /*  Add a file descriptor to the interest list of the epoll file descriptor, fd_epoll */
-        if (epoll_ctl(_fd, EPOLL_CTL_ADD ,fd, &event) == -1)
-        {
-            handle_error("epoll_ctl_client");  
-            return false;    
-        }
-        return true;
-    }
-
-    int EndPoint::Epool::waiterFunction(ThreadSafeQueue<std::string> &queue)
-    {
-        struct epoll_event *events;
-        /* clean container that stores events returned  by wait*/
-        events = (struct epoll_event*)  calloc (MAXEVENTS, sizeof(struct epoll_event));
-
-        // char buf[MAX_READ]={0};
-
-        while (1)
-        {
-            auto wait = epoll_wait(_fd, events, MAXEVENTS, -1); //wait infinite time for events
-            if (wait == -1)
-            {
-                handle_error("epoll_wait");      
-            }
-            for (size_t i = 0; i < wait; i++)
-            {
-                std::string fd ="-f "+ std::to_string(events[i].data.fd)+ " "; 
-                /* error or hang up happend */
-                if ((events[i].events & (EPOLLRDHUP | EPOLLERR | EPOLLHUP)) && 
-                (!(events[i].events & EPOLLIN))) /* TODO: some servers sends msg then close connection an 8193 is obtained should i close and  */
-                {
-                    fprintf (stderr, "epoll error. events=%u\n", events[i].events); //TODO: event string
-
-                    /* pass close request with file descriptor */
-                    queue.push(fd+"-c");
-	                continue;
-                }
-                else
-                {
-                    /* pass read request with file descriptor */
-                    queue.push(fd+"-r");
-                }
-            }
-        }
-        return 0;
-    }
 }

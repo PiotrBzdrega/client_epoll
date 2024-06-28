@@ -1,5 +1,6 @@
 #include "IO.h"
 #include "Servinfo.h"
+#include "Auxiliary.h"
 
 #include <sys/socket.h> //connect, bind
 #include <arpa/inet.h> // inet_ntop/_pton
@@ -7,13 +8,6 @@
 
 #include <iostream>
 #include <cstring>
-
-
-static int closeFd(int &fileDescriptor)
-{   
-    std::fprintf(stderr,"Close fd: %u\n",fileDescriptor);
-    return ::close(fileDescriptor);
-};
 
 namespace COM
 {
@@ -50,6 +44,14 @@ namespace COM
             (!ip.empty() && _ip.empty() && port != 0 && _port==0 && _fd == CLOSED && fd == _fd) /* not initialized connection*/
         )
         {
+            
+            if( _ip.empty() && _port==0 )
+            {
+                /* assign master address*/
+                _ip=ip;
+                _port=port;
+            }
+
             /* forward request and potential message*/
             _que.push(std::make_tuple(request,msg ));
 
@@ -71,8 +73,8 @@ namespace COM
 
         Servinfo servinfo;
         /* Translate name of a service location and/or a service name to set of socket addresses*/
-        ret = getaddrinfo(      _locIp.data(), //"172.22.64.1",  //"localhost", /* e.g. "www.example.com" or IP */
-                                std::to_string(_locPort).data(), /* e.g. "http" or port number  */
+        ret = getaddrinfo(      _ip.data(), //"172.22.64.1",  //"localhost", /* e.g. "www.example.com" or IP */
+                                std::to_string(_port).data(), /* e.g. "http" or port number  */
                                 &hints, /* prepared socket address structure*/
                                 &servinfo); /* pointer to sockaddr structure suitable for connecting, sending, binding to an IP/port pair*/
 
@@ -359,7 +361,9 @@ namespace COM
             if (_tls()==nullptr || _tls.connect(_fd) )
             {      
                 notifyManager();
+                std::printf("Connected\n");
                 return true;
+                
             }        
         }
         
