@@ -3,6 +3,8 @@
 
 namespace COM
 {
+
+    // modify Server and then check if epoll correctly returns notifications, make progress with libnodave each type
     Epoll::Epoll(ThreadSafeQueue<std::string> &queue)
     {
         _fd = epoll_create1(0);
@@ -45,14 +47,21 @@ namespace COM
         /* clean container that stores events returned  by wait*/
         events = (struct epoll_event*)  calloc (MAXEVENTS, sizeof(struct epoll_event));
 
-        // char buf[MAX_READ]={0};
+        // char buf[MAX_READ]={0}; 
 
         while (1)
         {
             auto wait = epoll_wait(_fd, events, MAXEVENTS, -1); //wait infinite time for events
             if (wait == -1)
             {
-                handle_error("epoll_wait");      
+                if (errno==EINTR)
+                {
+                    /* signal occured */
+                    continue;
+                }
+
+                handle_error("epoll_wait",true);
+                continue;     
             }
             for (size_t i = 0; i < wait; i++)
             {

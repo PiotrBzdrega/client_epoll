@@ -160,11 +160,13 @@ namespace COM
                 if (opt != "-m")
                 {
                     opt="-m";
-                    msg=word;
+                    //msg=word;
                     notification = req::WRITE;
                 }
-                
-                msg+=" "+word;               
+                else
+                {                   
+                    msg+=(msg.empty() ? "" :" ")+word;
+                }               
             }
             else
             if (word=="-r")
