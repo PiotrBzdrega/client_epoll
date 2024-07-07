@@ -8,6 +8,7 @@
 #include <charconv> //std::from_chars
 #include <regex>
 #include <tuple>
+#include <chrono>
 
 struct addrTCP
 {
@@ -88,15 +89,36 @@ namespace COM
                 interpretRequest(queue.pop());
             }    
         });
+
+        _timer = std::thread([&]{
+            while (1)
+            {
+                for ( int i=0; i< _peer.size(); ++i)
+                {
+                    /* call all available master */
+                    _peer[i].get()->timerCallback();
+                }
+                
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
+            
+        });
     } 
 
     EndPoint::~EndPoint()
     {
         if(stdIN.joinable())
         {   
-            /* wait for stdIN to */
+            /* wait for stdIN thread to terminate */
             stdIN.join();
         }
+
+        if (_timer.joinable())
+        {
+            /* wait for _timer thread to terminate */
+            _timer.join();
+        }
+        
     }
 
     bool EndPoint::appendNotificationNode(int fd, uint32_t param)

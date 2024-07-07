@@ -1,6 +1,7 @@
 #include "IO.h"
 #include "Servinfo.h"
 #include "Auxiliary.h"
+#include "NotImplemented.h"
 
 #include <sys/socket.h> //connect, bind
 #include <arpa/inet.h> // inet_ntop/_pton
@@ -29,6 +30,12 @@ namespace COM
     {
         if(servant.joinable()) {servant.join();}
     }
+
+    void IO::timerCallback()
+    {
+        throw NotImplemented();
+    }
+
     bool IO::request(std::string_view ip, uint16_t port, int fd, req request, std::string msg /*query &item*/)
     {
         //TODO: make in the future only one instance that handle read/write/close/connect/ with list of available masters state/ip/port/fd

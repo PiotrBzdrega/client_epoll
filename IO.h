@@ -32,6 +32,7 @@ namespace COM
         ~IO();
         // int operator()() {return _fd;}
         bool request(std::string_view ip, uint16_t port, int fd,  req request, std::string msg ) override;
+        void timerCallback() override;
         const std::string_view getIp() {return _locIp;}
         bool connect ();
         bool close ();

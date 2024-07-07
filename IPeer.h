@@ -29,6 +29,7 @@ protected:
 public:
     IPeer(IManager* manager, ILog* logger, IDB* db) : _manager(manager), _logger(logger), _db(db){};
     virtual bool request(std::string_view ip, uint16_t port, int fd,  req request, std::string msg ) = 0;
+    virtual void timerCallback() = 0;
     virtual ~IPeer() = default;
 };
 

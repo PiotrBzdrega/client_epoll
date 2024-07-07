@@ -22,6 +22,7 @@ namespace COM
         Epoll _epoll;
         std::vector<std::unique_ptr<IPeer>> _peer; //TODO: use unordered map if needed
         std::thread stdIN; /* execute msg's from queue */
+        std::thread _timer; /* calls */
         void interpretRequest(std::shared_ptr<std::string> arg);
         ILog* _logger;
         IDB* _db;
