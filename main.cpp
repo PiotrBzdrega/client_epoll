@@ -2,7 +2,9 @@
 #include <string>
 #include <cstring> // std::memset
 #include <algorithm> // std::replace
+#include <charconv> //std::from_chars
 
+#ifdef  __linux__
 #include <sys/socket.h> //connect, bind
 #include <unistd.h> //close, read, write
 #include <sys/file.h> //flock, open
@@ -12,7 +14,8 @@
 #include <sys/epoll.h> //epoll
 #include <signal.h> //signal
 #include <mqueue.h> //mq
-#include <charconv> //std::from_chars
+#endif
+
 
 #include "Auxiliary.h"
 #include "EndPoint.h"
@@ -80,8 +83,38 @@ void new_msg_queue(union sigval sv)
     // }
 }
 
+/* Initialize Winsock */
+[[nodiscard]] bool winsockInit()
+{
+#ifdef _WIN32 //available for both x64 and x32
+    WSADATA wsaData;
+    int res=WSAStartup(MAKEWORD(2,2), &wsaData);
+    if (!res)
+    {
+        std::printf("WSAStartup failed with error: %d\n", res);
+        return EXIT_FAILURE;
+    }
+
+#else
+    return EXIT_SUCCESS;
+#endif
+}
+
+/*  Winsock cleanup */
+void winsockCleanUp()
+{
+#ifdef _WIN32 //available for both x64 and x32
+   WSACleanup();
+#endif
+}
+
 int main(int argc, char *argv[])
 {
+    if(!winsockInit())
+    {
+        return EXIT_FAILURE;
+    }
+
     int ret;
     std::string_view ip;
     uint16_t port;
@@ -525,8 +558,9 @@ regions of the same file.*/
 
         
     // }
-    while(1)
+    while(1) //TODO: join instead superloop
     {
         sleep(100000);
     }
+    winsockCleanUp()
 }
