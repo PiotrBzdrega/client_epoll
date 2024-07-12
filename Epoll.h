@@ -1,6 +1,9 @@
 #pragma once
 
+#ifdef  __linux__
 #include <sys/epoll.h> //epoll
+#endif
+
 #include <thread>
 #include "ThreadSafeQueue.h"
 

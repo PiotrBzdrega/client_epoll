@@ -14,16 +14,22 @@
 #include <sys/epoll.h> //epoll
 #include <signal.h> //signal
 #include <mqueue.h> //mq
+#elif _WIN32 //available for both x64 and x32
+// #define WIN32_LEAN_AND_MEAN //reduce the size of the Windows header files by excluding some of the less commonly used APIs
+#include <winsock2.h>
+#include <windows.h>
 #endif
 
 
 #include "Auxiliary.h"
 #include "EndPoint.h"
 
-constexpr auto mq_name="/mq_client";
-
 /* container to transfer command lines from second instance to EndPoint */
 COM::ThreadSafeQueue<std::string> queue;
+
+#ifdef  __linux__
+
+constexpr auto mq_name="/mq_client";
 
 void new_msg_queue(union sigval sv)
 {
@@ -82,9 +88,15 @@ void new_msg_queue(union sigval sv)
     //     exit(EXIT_SUCCESS);         /* Terminate the process */
     // }
 }
+#elif _WIN32 //available for both x64 and x32 
+
+constexpr auto ms_name=TEXT("\\\\.\\mailslot\\ms_client");
+
+
+#endif
 
 /* Initialize Winsock */
-[[nodiscard]] bool winsockInit()
+[[nodiscard]] bool winsockInit() //TODO: try to insert somewhere to be called only once
 {
 #ifdef _WIN32 //available for both x64 and x32
     WSADATA wsaData;
@@ -92,9 +104,9 @@ void new_msg_queue(union sigval sv)
     if (!res)
     {
         std::printf("WSAStartup failed with error: %d\n", res);
+        /* WSACleanup should be called olny after succesfull call to WSAStartup */
         return EXIT_FAILURE;
     }
-
 #else
     return EXIT_SUCCESS;
 #endif
@@ -110,6 +122,17 @@ void winsockCleanUp()
 
 int main(int argc, char *argv[])
 {
+LOGGER
+    class my_class; // Forward declaration of the class
+
+my_class& get_my_class_instance()
+{
+    static my_class instance; // Static variable to hold the single instance of my_class
+    return instance; // Return the reference to the instance
+}
+
+
+
     if(!winsockInit())
     {
         return EXIT_FAILURE;
@@ -181,6 +204,11 @@ regions of the same file.*/
 
         std::string_view request(buffer);
 
+
+        mailSlot
+
+
+
         // check if we pass correctly without spaces between -i 12532u5032:23423
         // Open the message queue for sending
         mqdes = mq_open(mq_name, O_WRONLY);
@@ -201,6 +229,25 @@ regions of the same file.*/
     else
     {
         /* First Instance */
+
+        // Create a mailslot
+        HANDLE hMailslot = CreateMailslot(ms_name,
+                                      0, // no maximum message size
+                                      MAILSLOT_WAIT_FOREVER, // no time-out
+                                      NULL); // default security attributes
+
+        if (INVALID_HANDLE_VALUE == hMailslot) 
+        {
+             printf("\nError occurred while" 
+                    " creating the mailslot: %d", GetLastError()); 
+             return 1;  //Error
+        }
+        else
+        {
+             printf("\nCreateMailslot() was successful.");
+        }
+
+
         mqdes = mq_open(mq_name,O_RDONLY | O_CREAT | O_NONBLOCK /* | O_EXCL */,0600,NULL);
         if (mqdes == (mqd_t) -1)
         {
