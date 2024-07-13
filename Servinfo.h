@@ -1,6 +1,10 @@
 #pragma once
 
+
+#ifdef  __linux__
 #include <netdb.h> //freeaddrinfo
+#elif _WIN32 //available for both x64 and x32
+#endif
 
 class Servinfo
 {

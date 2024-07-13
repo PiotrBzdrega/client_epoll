@@ -3,8 +3,11 @@
 #include "Auxiliary.h"
 #include "NotImplemented.h"
 
+#ifdef  __linux__
 #include <sys/socket.h> //connect, bind
 #include <arpa/inet.h> // inet_ntop/_pton
+#elif _WIN32 //available for both x64 and x32
+#endif
 #include <fcntl.h>
 
 #include <iostream>

@@ -26,9 +26,11 @@ namespace COM
         void interpretRequest(std::shared_ptr<std::string> arg);
         ILog* _logger;
         IDB* _db;
+
     public:
         EndPoint (std::string_view ip, uint16_t port, ThreadSafeQueue<std::string> &queue, ILog* logger = &emptyLogger, IDB* db = &emptyDB);
         ~EndPoint ();
+        void join();
         bool appendNotificationNode(int fd, uint32_t param) override;
         void addPeer(std::string_view ip, std::string_view port, bool ssl);
         // template<typename... Args>

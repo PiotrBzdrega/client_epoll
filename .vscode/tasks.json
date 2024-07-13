@@ -4,23 +4,23 @@
 		{
 			"type": "cppbuild",
 			"label": "C/C++: g++ build active file",
-			"command": "/usr/bin/g++",
+			"command": "C:\\msys64\\ucrt64\\bin\\g++.exe",//"/usr/bin/g++",
 			"args": [
 				// "-std=c++17",
 				"-fdiagnostics-color=always",
 				"-g",
-				"${fileDirname}/main.cpp",
-				"${fileDirname}/EndPoint.cpp",
-				"${fileDirname}/Epoll.cpp",
-				"${fileDirname}/TLS.cpp",
-				"${fileDirname}/IO.cpp",
+				"${fileDirname}${pathSeparator}main.cpp",
+				"${fileDirname}${pathSeparator}EndPoint.cpp",
+				"${fileDirname}${pathSeparator}Epoll.cpp",
+				"${fileDirname}${pathSeparator}TLS.cpp",
+				"${fileDirname}${pathSeparator}IO.cpp",
 				"-I${fileDirname}",
-				"-I/usr/include/openssl", // OpenSSL include directory
-				"-L/usr/lib", // General library directory
+				"-I/usr${pathSeparator}include${pathSeparator}openssl", // OpenSSL include directory
+				"-L${pathSeparator}usr${pathSeparator}lib", // General library directory
 				"-lssl", // Link OpenSSL SSL library
 				"-lcrypto", // Link OpenSSL Crypto library
 				"-o",
-				"${fileDirname}/build/client",
+				"${fileDirname}${pathSeparator}build${pathSeparator}client",
 				
 			],
 			"options": {

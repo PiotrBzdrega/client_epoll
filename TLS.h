@@ -2,8 +2,11 @@
 
 #include <string> //std::string_view
 
+#ifdef  __linux__
 #include <openssl/ssl.h>
 #include <openssl/err.h>
+#elif _WIN32 //available for both x64 and x32
+#endif
 
 namespace COM
 {

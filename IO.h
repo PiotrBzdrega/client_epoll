@@ -4,7 +4,11 @@
 #include "IPeer.h"
 #include "ThreadSafeQueue.h"
 
+#ifdef  __linux__
 #include <unistd.h> //close, read, write
+#elif _WIN32 //available for both x64 and x32
+#endif
+
 #include <string_view>
 #include <thread>
 #include <mutex>

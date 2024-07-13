@@ -16,8 +16,9 @@
 #include <mqueue.h> //mq
 #elif _WIN32 //available for both x64 and x32
 // #define WIN32_LEAN_AND_MEAN //reduce the size of the Windows header files by excluding some of the less commonly used APIs
-#include <winsock2.h>
-#include <windows.h>
+// #include <winsock2.h>
+// #include <windows.h>
+#include "MailSlot.h"
 #endif
 
 
@@ -229,23 +230,6 @@ regions of the same file.*/
     else
     {
         /* First Instance */
-
-        // Create a mailslot
-        HANDLE hMailslot = CreateMailslot(ms_name,
-                                      0, // no maximum message size
-                                      MAILSLOT_WAIT_FOREVER, // no time-out
-                                      NULL); // default security attributes
-
-        if (INVALID_HANDLE_VALUE == hMailslot) 
-        {
-             printf("\nError occurred while" 
-                    " creating the mailslot: %d", GetLastError()); 
-             return 1;  //Error
-        }
-        else
-        {
-             printf("\nCreateMailslot() was successful.");
-        }
 
 
         mqdes = mq_open(mq_name,O_RDONLY | O_CREAT | O_NONBLOCK /* | O_EXCL */,0600,NULL);
@@ -605,9 +589,12 @@ regions of the same file.*/
 
         
     // }
-    while(1) //TODO: join instead superloop
-    {
-        sleep(100000);
-    }
-    winsockCleanUp()
+    // while(1) //TODO: join instead superloop
+    // {
+    //     sleep(100000);
+    // }
+
+    /* wait Manager to be finnished */
+    client.join();
+    winsockCleanUp();
 }

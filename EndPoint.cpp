@@ -76,49 +76,53 @@ namespace COM
 //TODO:        5. try maybe icmp before blind reconnect for training
 //TODO:        6. IO should contain waiting condition variable, EndPoint should keep lock as long as no request are comming
 
-    EndPoint::EndPoint(std::string_view ip, uint16_t port, ThreadSafeQueue<std::string> &queue,ILog* logger, IDB* db) : _epoll(queue), _logger(logger), _db(db)
-    {
-        /* create new Peer */
-        _peer.emplace_back(std::make_unique<IO>(ip,port,false,this,_logger,_db));
+void EndPoint::join()
+{
+    if(stdIN.joinable())
+    {   
+        /* wait for stdIN thread to terminate */
+        stdIN.join();
+    }
 
-        // stdIN = std::thread(&EndPoint::stdINLoop,this,queue);
-        /* wait for new message */
-        stdIN = std::thread([&]{
+    if (_timer.joinable())
+    {
+        /* wait for _timer thread to terminate */
+        _timer.join();
+    }
+}
+
+EndPoint::EndPoint(std::string_view ip, uint16_t port, ThreadSafeQueue<std::string> &queue, ILog *logger, IDB *db) : _epoll(queue), _logger(logger), _db(db)
+{
+    /* create new Peer */
+    _peer.emplace_back(std::make_unique<IO>(ip, port, false, this, _logger, _db));
+
+    // stdIN = std::thread(&EndPoint::stdINLoop,this,queue);
+    /* wait for new message */
+    stdIN = std::thread([&]
+                        {
             while (1)
             {
                 interpretRequest(queue.pop());
-            }    
-        });
+            } });
 
-        _timer = std::thread([&]{
-            while (1)
-            {
-                for ( int i=0; i< _peer.size(); ++i)
-                {
-                    /* call all available master */
-                    _peer[i].get()->timerCallback();
-                }
-                
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            }
-            
-        });
+    _timer = std::thread([&]
+                         {
+                             while (1)
+                             {
+                                 for (int i = 0; i < _peer.size(); ++i)
+                                 {
+                                     /* call all available master */
+                                     _peer[i].get()->timerCallback();
+                                 }
+
+                                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                             }
+                         });
     } 
 
     EndPoint::~EndPoint()
     {
-        if(stdIN.joinable())
-        {   
-            /* wait for stdIN thread to terminate */
-            stdIN.join();
-        }
-
-        if (_timer.joinable())
-        {
-            /* wait for _timer thread to terminate */
-            _timer.join();
-        }
-        
+        join();
     }
 
     bool EndPoint::appendNotificationNode(int fd, uint32_t param)
