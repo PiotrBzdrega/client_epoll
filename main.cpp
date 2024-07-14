@@ -15,13 +15,11 @@
 #include <signal.h> //signal
 #include <mqueue.h> //mq
 #elif _WIN32 //available for both x64 and x32
-// #define WIN32_LEAN_AND_MEAN //reduce the size of the Windows header files by excluding some of the less commonly used APIs
-// #include <winsock2.h>
-// #include <windows.h>
 #include "MailSlot.h"
+#include "WinSockInit.h"
 #endif
 
-
+#include "Logger.h"
 #include "Auxiliary.h"
 #include "EndPoint.h"
 
@@ -91,53 +89,25 @@ void new_msg_queue(union sigval sv)
 }
 #elif _WIN32 //available for both x64 and x32 
 
-constexpr auto ms_name=TEXT("\\\\.\\mailslot\\ms_client");
+
 
 
 #endif
 
-/* Initialize Winsock */
-[[nodiscard]] bool winsockInit() //TODO: try to insert somewhere to be called only once
-{
-#ifdef _WIN32 //available for both x64 and x32
-    WSADATA wsaData;
-    int res=WSAStartup(MAKEWORD(2,2), &wsaData);
-    if (!res)
-    {
-        std::printf("WSAStartup failed with error: %d\n", res);
-        /* WSACleanup should be called olny after succesfull call to WSAStartup */
-        return EXIT_FAILURE;
-    }
-#else
-    return EXIT_SUCCESS;
-#endif
-}
 
-/*  Winsock cleanup */
-void winsockCleanUp()
-{
-#ifdef _WIN32 //available for both x64 and x32
-   WSACleanup();
-#endif
-}
+
 
 int main(int argc, char *argv[])
 {
-LOGGER
-    class my_class; // Forward declaration of the class
 
-my_class& get_my_class_instance()
-{
-    static my_class instance; // Static variable to hold the single instance of my_class
-    return instance; // Return the reference to the instance
-}
+#ifdef _WIN32 //available for both x64 and x32
+    /* WinsockInit singleton RAII wrapper */
+    auto& winsock = WinSock::instance();
+#endif
 
-
-
-    if(!winsockInit())
-    {
-        return EXIT_FAILURE;
-    }
+    /* Logger singlton*/
+    auto& logger = Logger::instance(); //TODO: find best design 
+    use logger from miq
 
     int ret;
     std::string_view ip;
@@ -145,6 +115,7 @@ my_class& get_my_class_instance()
     bool with_tls = false;
     bool test_timer = false;
 
+    extract to class posix message queue from main
     mqd_t mqdes;
     /* create if do not exist */
     int pid_file = open("/var/run/client.pid", O_CREAT | O_RDWR, 0666);

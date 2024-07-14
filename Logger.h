@@ -3,9 +3,19 @@
 
 class Logger final : public ILog
 {
-    // private:
-    //     EmptyLogger() { }
-    // public:
+    private:
+        Logger(){ }
+    public:
+    Logger(const Logger&) = delete;
+    Logger& operator=(const Logger&) = delete;
+    Logger(Logger&&) = delete;
+    Logger& operator=(Logger&&) = delete;
+
     // void log(std::string_view) override {};
-    // EmptyLogger(const EmptyLogger& obj) = delete; // Delete copy constructor
+    inline static Logger& instance()
+    {
+       static Logger inst;
+       return inst;
+    };
+
 };

@@ -3,10 +3,10 @@
 	"tasks": [
 		{
 			"type": "cppbuild",
-			"label": "C/C++: g++ build active file",
-			"command": "C:\\msys64\\ucrt64\\bin\\g++.exe",//"/usr/bin/g++",
+			"label": "C/C++: g++ build WINDOWS",
+			"command": "C:\\msys64\\ucrt64\\bin\\g++.exe",
 			"args": [
-				// "-std=c++17",
+				"-std=c++20",
 				"-fdiagnostics-color=always",
 				"-g",
 				"${fileDirname}${pathSeparator}main.cpp",
@@ -14,6 +14,39 @@
 				"${fileDirname}${pathSeparator}Epoll.cpp",
 				"${fileDirname}${pathSeparator}TLS.cpp",
 				"${fileDirname}${pathSeparator}IO.cpp",
+				"${fileDirname}${pathSeparator}MailSlot.cpp",
+				"-I${fileDirname}",
+				"-I/usr${pathSeparator}include${pathSeparator}openssl", // OpenSSL include directory
+				"-L${pathSeparator}usr${pathSeparator}lib", // General library directory
+				"-lssl", // Link OpenSSL SSL library
+				"-lcrypto", // Link OpenSSL Crypto library
+				"-o",
+				"${fileDirname}${pathSeparator}build${pathSeparator}client",
+				
+			],
+			"options": {
+				"cwd": "${fileDirname}"
+			},
+			"problemMatcher": [
+				"$gcc"
+			],
+			"group": "build",
+			"detail": "compiler: C:\\msys64\\ucrt64\\bin\\g++.exe"
+		},
+		{
+			"type": "cppbuild",
+			"label": "C/C++: g++ build LINUX",
+			"command": "/usr/bin/g++",
+			"args": [
+				"-std=c++20",
+				"-fdiagnostics-color=always",
+				"-g",
+				"${fileDirname}${pathSeparator}main.cpp",
+				"${fileDirname}${pathSeparator}EndPoint.cpp",
+				"${fileDirname}${pathSeparator}Epoll.cpp",
+				"${fileDirname}${pathSeparator}TLS.cpp",
+				"${fileDirname}${pathSeparator}IO.cpp",
+				"${fileDirname}${pathSeparator}MailSlot.cpp",
 				"-I${fileDirname}",
 				"-I/usr${pathSeparator}include${pathSeparator}openssl", // OpenSSL include directory
 				"-L${pathSeparator}usr${pathSeparator}lib", // General library directory
