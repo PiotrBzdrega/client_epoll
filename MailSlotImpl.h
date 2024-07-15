@@ -8,7 +8,7 @@
 inline HANDLE initReceiver(const wchar_t *ms_name)
 {
     // Create a mailslot
-    HANDLE hMailslot = CreateMailslot(ms_name,
+    HANDLE hMailslot = CreateMailslotW(ms_name,
                                 0, // no limitation of maximum message size
                                 MAILSLOT_WAIT_FOREVER, // no time-out
                                 NULL); // default security attributes
@@ -31,7 +31,7 @@ inline HANDLE initSender(const wchar_t *ms_name)
 
 
     // Open a handle to the mailslot
-    HANDLE hMailslot = CreateFile(
+    HANDLE hMailslot = CreateFileW(
         ms_name, // Mailslot name
         GENERIC_WRITE,                       // Write access
         FILE_SHARE_READ,                     // Shared read access

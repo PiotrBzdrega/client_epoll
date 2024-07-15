@@ -15,11 +15,14 @@
 				"${fileDirname}${pathSeparator}TLS.cpp",
 				"${fileDirname}${pathSeparator}IO.cpp",
 				"${fileDirname}${pathSeparator}MailSlot.cpp",
-				"-I${fileDirname}",
-				"-I/usr${pathSeparator}include${pathSeparator}openssl", // OpenSSL include directory
-				"-L${pathSeparator}usr${pathSeparator}lib", // General library directory
+				// "-I${fileDirname}",
+				"-I",
+				"C:${pathSeparator}msys64${pathSeparator}usr${pathSeparator}local${pathSeparator}include", // OpenSSL include directory
+				"-L",
+				"C:${pathSeparator}msys64${pathSeparator}usr${pathSeparator}local${pathSeparator}lib64", // General library directory
 				"-lssl", // Link OpenSSL SSL library
 				"-lcrypto", // Link OpenSSL Crypto library
+				"-lkernel32", // Windows specific functions
 				"-o",
 				"${fileDirname}${pathSeparator}build${pathSeparator}client",
 				
@@ -27,9 +30,7 @@
 			"options": {
 				"cwd": "${fileDirname}"
 			},
-			"problemMatcher": [
-				"$gcc"
-			],
+			"problemMatcher": ["$gcc"],
 			"group": "build",
 			"detail": "compiler: C:\\msys64\\ucrt64\\bin\\g++.exe"
 		},
@@ -59,9 +60,7 @@
 			"options": {
 				"cwd": "${fileDirname}"
 			},
-			"problemMatcher": [
-				"$gcc"
-			],
+			"problemMatcher": ["$gcc"],
 			"group": "build",
 			"detail": "compiler: /usr/bin/g++"
 		}

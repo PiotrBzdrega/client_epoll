@@ -17,11 +17,13 @@
 #elif _WIN32 //available for both x64 and x32
 #include "MailSlot.h"
 #include "WinSockInit.h"
+#include "ProcessInstance.h"
 #endif
 
 #include "Logger.h"
 #include "Auxiliary.h"
 #include "EndPoint.h"
+
 
 /* container to transfer command lines from second instance to EndPoint */
 COM::ThreadSafeQueue<std::string> queue;
@@ -103,11 +105,17 @@ int main(int argc, char *argv[])
 #ifdef _WIN32 //available for both x64 and x32
     /* WinsockInit singleton RAII wrapper */
     auto& winsock = WinSock::instance();
+
+    /* Child or Parent process */
+    COM::ProcessInstance isParent;
 #endif
+
+    
+
 
     /* Logger singlton*/
     auto& logger = Logger::instance(); //TODO: find best design 
-    use logger from miq
+    // use logger from miq
 
     int ret;
     std::string_view ip;
@@ -567,5 +575,4 @@ regions of the same file.*/
 
     /* wait Manager to be finnished */
     client.join();
-    winsockCleanUp();
 }
