@@ -1,7 +1,10 @@
 #pragma once
 
+#ifdef __linux__
+#elif _WIN32
 #include <winsock2.h>
 #include <windows.h>
+#endif
 #include <cstdio>
 #include <cstdlib>
 

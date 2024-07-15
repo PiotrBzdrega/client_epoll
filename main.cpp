@@ -17,9 +17,9 @@
 #elif _WIN32 //available for both x64 and x32
 #include "MailSlot.h"
 #include "WinSockInit.h"
-#include "ProcessInstance.h"
 #endif
 
+#include "ProcessInstance.h"
 #include "Logger.h"
 #include "Auxiliary.h"
 #include "EndPoint.h"
@@ -105,62 +105,25 @@ int main(int argc, char *argv[])
 #ifdef _WIN32 //available for both x64 and x32
     /* WinsockInit singleton RAII wrapper */
     auto& winsock = WinSock::instance();
-
-    /* Child or Parent process */
-    COM::ProcessInstance isParent;
 #endif
-
-    
-
 
     /* Logger singlton*/
     auto& logger = Logger::instance(); //TODO: find best design 
     // use logger from miq
 
+    /* Child or Parent process */
+    COM::ProcessInstance isParent;
+    
     int ret;
     std::string_view ip;
     uint16_t port;
     bool with_tls = false;
     bool test_timer = false;
 
-    extract to class posix message queue from main
     mqd_t mqdes;
-    /* create if do not exist */
-    int pid_file = open("/var/run/client.pid", O_CREAT | O_RDWR, 0666);
-    if (pid_file == -1) {
-        handle_error("open",true);
-    }
-/*The fcntl() system call provides record
-locking, allowing processes to place multiple read and write locks on different
-regions of the same file.*/
 
-    struct flock fl;
-
-    // Initialize the flock structure
-    fl.l_type = F_WRLCK;   // Exclusive lock
-    fl.l_whence = SEEK_SET; //Seek from beginning of file
-    fl.l_start = 0;
-    fl.l_len = 0; //whole file if 0
-
-    // Attempt to acquire the lock
-    int rc = fcntl(pid_file, F_SETLK, &fl); //Set record locking info (non-blocking)
-    
-    if(rc) 
+    if(!isParent()) 
     {
-        /* Another instance, file already locked*/
-
-        std::cout<<"errno: "<<strerror(errno)<<"\n";
-        if(EWOULDBLOCK == errno)
-        {
-            std::cout<<"\033[0;91m another instance is running \033[0m\n";
-
-            int rc = fcntl(pid_file, F_GETLK, &fl); //Get record locking info
-            std::cout<<"\033[0;91m Process ID of the process that holds the blocking lock "<<fl.l_pid<<"\033[0m\n";       
-        }
-        else
-        {
-            exit(EXIT_FAILURE);
-        }
 
         std::printf("Read arguments:\n");
         for (size_t i = 0; i < argc; i++)
