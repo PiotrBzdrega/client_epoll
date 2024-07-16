@@ -4,7 +4,9 @@
 #include <cstdlib>
 #ifdef  __linux__
 #include <unistd.h>
-#elif _WIN32 //available for both x64 and x32
+using SOCKET=int;
+#elif _WIN32
+#include <winsock2.h> //closesocket
 #endif
 
 inline void handle_error(const char* msg, bool exit_proc=false)
@@ -13,8 +15,12 @@ inline void handle_error(const char* msg, bool exit_proc=false)
     if(exit_proc) {exit(EXIT_FAILURE);}
 };
 
-inline int closeFd(int &fileDescriptor)
+inline int closeFd(SOCKET &fileDescriptor)
 {   
     std::fprintf(stderr,"Close fd: %u\n",fileDescriptor);
+#ifdef  __linux__
     return ::close(fileDescriptor);
+#elif _WIN32
+    return closesocket(fileDescriptor);
+#endif
 };

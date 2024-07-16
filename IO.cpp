@@ -6,7 +6,11 @@
 #ifdef  __linux__
 #include <sys/socket.h> //connect, bind
 #include <arpa/inet.h> // inet_ntop/_pton
+#include <unistd.h> //close, read, write
 #elif _WIN32 //available for both x64 and x32
+#include <windows.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #endif
 #include <fcntl.h>
 
@@ -39,7 +43,7 @@ namespace COM
         throw NotImplemented();
     }
 
-    bool IO::request(std::string_view ip, uint16_t port, int fd, req request, std::string msg /*query &item*/)
+    bool IO::request(std::string_view ip, uint16_t port, SOCKET fd, req request, std::string msg /*query &item*/)
     {
         //TODO: make in the future only one instance that handle read/write/close/connect/ with list of available masters state/ip/port/fd
         //try to create it
@@ -74,11 +78,13 @@ namespace COM
     int IO::connectTCP()
     {
         int ret;
- 
+
+        /* to ensure all fields are set to default values (0 or NULL for pointers) */
         struct addrinfo hints = {0}; 
         {
             hints.ai_family = AF_UNSPEC;     /* Allow IPv4 or IPv6 */
             hints.ai_socktype = SOCK_STREAM; /* TCP */
+            // hints.ai_protocol = IPPROTO_TCP; //TODO: not sure if needed for Windows , for X can be omited
         }
 
         Servinfo servinfo;
@@ -94,7 +100,7 @@ namespace COM
             handle_error("getaddrinfo");
         }
 
-        int fd = CLOSED; /* client file descriptor */
+        SOCKET fd = CLOSED; /* client file descriptor */
 
         for(struct addrinfo *ptr = servinfo; ptr != nullptr;  ptr= ptr->ai_next)
         { 
@@ -279,7 +285,7 @@ namespace COM
         return fd;
     }
 
-    int IO::setNonBlock(int fd)
+    int IO::setNonBlock(SOCKET fd)
     {
         int ret{};
         /* get file descriptor flags */
@@ -418,6 +424,7 @@ namespace COM
         else
         {
             /* unsecure TCP */
+#ifdef  __linux__           
             res = ::read(_fd,_buffer, MAX_READ);
             if (res== -1 && errno != EAGAIN)
             {
@@ -429,7 +436,10 @@ namespace COM
             if (res ==0)
             {
                 std::printf("End of file\n");
-            }  
+            }
+ #elif _WIN32
+            res = recv(_fd,_buffer, MAX_READ);
+ #endif
         }
         return res;
     }

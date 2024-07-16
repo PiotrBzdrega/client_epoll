@@ -3,7 +3,8 @@
 
 #ifdef  __linux__
 #include <netdb.h> //freeaddrinfo
-#elif _WIN32 //available for both x64 and x32
+#elif _WIN32
+#include <ws2tcpip.h> //freeaddrinfo
 #endif
 
 class Servinfo

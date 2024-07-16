@@ -3,11 +3,16 @@
 #include <string_view>
 #include <vector>
 #include <thread>
-
 #include "IPeer.h"
 #include "EmptyImplementation.h"
 #include "IManager.h"
 #include "Epoll.h"
+
+#ifdef  __linux__
+using SOCKET=int;
+#elif _WIN32
+#include <winsock2.h> //closesocket
+#endif
 
 #include "ThreadSafeQueue.h"
 
@@ -31,7 +36,7 @@ namespace COM
         EndPoint (std::string_view ip, uint16_t port, ThreadSafeQueue<std::string> &queue, ILog* logger = &emptyLogger, IDB* db = &emptyDB);
         ~EndPoint ();
         void join();
-        bool appendNotificationNode(int fd, uint32_t param) override;
+        bool appendNotificationNode(SOCKET fd, uint32_t param) override;
         void addPeer(std::string_view ip, std::string_view port, bool ssl);
         // template<typename... Args>
         // IO& find(Args... args);

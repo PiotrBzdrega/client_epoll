@@ -125,7 +125,7 @@ EndPoint::EndPoint(std::string_view ip, uint16_t port, ThreadSafeQueue<std::stri
         join();
     }
 
-    bool EndPoint::appendNotificationNode(int fd, uint32_t param)
+    bool EndPoint::appendNotificationNode(SOCKET fd, uint32_t param)
     {
         return _epoll.addNew(fd, param);
     }

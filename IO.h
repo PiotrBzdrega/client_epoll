@@ -5,8 +5,9 @@
 #include "ThreadSafeQueue.h"
 
 #ifdef  __linux__
-#include <unistd.h> //close, read, write
-#elif _WIN32 //available for both x64 and x32
+using SOCKET=int;
+#elif _WIN32
+#include <winsock2.h> //closesocket
 #endif
 
 #include <string_view>
@@ -27,7 +28,7 @@ namespace COM
         uint16_t _locPort;
         char _buffer[MAX_READ]{}; //TODO:change for std::array
         int connectTCP();
-        int setNonBlock(int fd);
+        int setNonBlock(SOCKET fd);
         std::thread servant;
         void threadFunc();
         ThreadSafeQueue<query> _que;
@@ -35,7 +36,7 @@ namespace COM
         IO(std::string_view ip, uint16_t port, bool ssl, IManager* manager, ILog* logger, IDB* db);
         ~IO();
         // int operator()() {return _fd;}
-        bool request(std::string_view ip, uint16_t port, int fd,  req request, std::string msg ) override;
+        bool request(std::string_view ip, uint16_t port, SOCKET fd,  req request, std::string msg ) override;
         void timerCallback() override;
         const std::string_view getIp() {return _locIp;}
         bool connect ();
