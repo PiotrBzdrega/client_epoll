@@ -85,6 +85,7 @@ namespace COM
             hints.ai_family = AF_UNSPEC;     /* Allow IPv4 or IPv6 */
             hints.ai_socktype = SOCK_STREAM; /* TCP */
             // hints.ai_protocol = IPPROTO_TCP; //TODO: not sure if needed for Windows , for X can be omited
+            // hints.ai_flags = AI_PASSIVE; //TODO: not sure if needed for Windows , for X can be omited
         }
 
         Servinfo servinfo;
@@ -324,7 +325,12 @@ namespace COM
                 while (_fd==CLOSED)
                 {
                     connect();
+#ifdef  __linux__                   
                     sleep(5);
+#elif _WIN32
+                    Sleep(5000);
+#endif
+                    
                 }
             }
             else
@@ -426,26 +432,35 @@ namespace COM
             /* unsecure TCP */
 #ifdef  __linux__           
             res = ::read(_fd,_buffer, MAX_READ);
-            if (res== -1 && errno != EAGAIN)
+#elif _WIN32
+            res = recv(_fd,_buffer, MAX_READ,0);
+#endif
+            if (res== -1)
             {
-                /* some error appears, but anyway socket must be closed, then modify res */
-                handle_error("read");
-                res=0;
+#ifdef  __linux__                 
+                auto err = (errno == EAGAIN);
+#elif _WIN32
+                auto err = (WSAGetLastError() == WSAETIMEDOUT);
+#endif
+                if(err)
+                {
+                    /* some error appears, but anyway socket must be closed, then modify res */
+                    handle_error("read");
+                    res=0;
+                }
             }
             else
             if (res ==0)
             {
                 std::printf("End of file\n");
             }
- #elif _WIN32
-            res = recv(_fd,_buffer, MAX_READ);
- #endif
         }
         return res;
     }
 
     int IO::write(const void* buffer, int count)
     {
+
         SSL *ssl_obj = _tls();
 
         int res{};
